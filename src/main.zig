@@ -6,12 +6,13 @@ const utlralight = @import("utlralight");
 
 const LPDWORD = *windows.DWORD;
 
-const STD_ERROR_HANDLE: windows.DWORD = -12;
+const BOOL = c_int;
+
+const STD_ERROR_HANDLE: windows.DWORD = @bitCast(@as(i32, -12));
 
 const WINDOWCOMPOSITIONATTRIB = enum(c_uint) {
     WCA_ACCENT_POLICY = 19,
 };
-
 const ACCENT_STATE = enum(u32) {
     ACCENT_DISABLED = 0,
     ACCENT_ENABLE_GRADIENT = 1,
@@ -28,7 +29,7 @@ const ACCENT_POLICY = extern struct {
     animation_id: u32,
 };
 
-const WINDOWCOMPOSITIONATTRIBDATA = struct {
+const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
     Attrib: WINDOWCOMPOSITIONATTRIB,
     pvData: *anyopaque,
     cbData: c_uint,
@@ -36,7 +37,7 @@ const WINDOWCOMPOSITIONATTRIBDATA = struct {
 
 extern "kernel32" fn LoadLibraryW(lpLibFileName: windows.LPCSTR) callconv(.winapi) ?windows.HMODULE;
 
-extern "kernel32" fn FreeLibrary(hLibModule: windows.HMODULE) callconv(.winapi) ?windows.BOOL;
+extern "kernel32" fn FreeLibrary(hLibModule: windows.HMODULE) callconv(.winapi) BOOL;
 
 extern "kernel32" fn GetProcAddress(
     hModule: windows.HMODULE,
@@ -47,15 +48,38 @@ extern "kernel32" fn GetStdHandle(nStdHandle: windows.DWORD) callconv(.winapi) ?
 
 extern "kernel32" fn FindWindowW(
     lpClassName: windows.LPCWSTR,
-    lpWindowName: windows.LPCWSTR,
+    lpWindowName: ?windows.LPCWSTR,
 ) callconv(.winapi) ?windows.HWND;
 
-extern "kernel32" fn WriteFileW(
+extern "kernel32" fn WriteFile(
     hFile: windows.HANDLE,
     lpBuffer: windows.LPCVOID,
     nNumberOfBytesToWrite: windows.DWORD,
     lpNumberOfBytesWritten: LPDWORD,
-    lpOverlapped: null,
-) callconv(.winapi) ?windows.BOOL;
+    lpOverlapped: ?*anyopaque,
+) callconv(.winapi) BOOL;
 
-const SetWindowCompositionAttributeType = fn (hwnd: windows.HWND, pwcad: WINDOWCOMPOSITIONATTRIBDATA) callconv(.winapi) ?windows.BOOL;
+const SetWindowCompositionAttributeType = *const fn (
+    hwnd: windows.HWND,
+    pwcad: *const WINDOWCOMPOSITIONATTRIBDATA,
+) callconv(.winapi) BOOL;
+
+pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
+    _ = trace;
+    _ = ret_addr;
+
+    // Safe writing without allocations
+    if (GetStdHandle(STD_ERROR_HANDLE)) |handle| {
+        if (handle != windows.INVALID_HANDLE_VALUE) {
+            var writtenBytes: windows.DWORD = 0;
+            _ = WriteFile(
+                handle,
+                msg.ptr,
+                @intCast(msg.len),
+                &writtenBytes,
+                null,
+            );
+        }
+    }
+    @trap();
+}
