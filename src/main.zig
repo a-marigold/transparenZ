@@ -54,6 +54,30 @@ extern "user32" fn SetWindowCompositionAttribute(
     pwcad: *const WINDOWCOMPOSITIONATTRIBDATA,
 ) callconv(.winapi) BOOL;
 
+pub fn main() void {
+    const taskBarHwnd = FindWindowW(
+        std.unicode.utf8ToUtf16LeStringLiteral("Shell_TrayWnd"),
+        null,
+    ) orelse {
+        @panic("abc");
+    };
+
+    var accentPolicy: ACCENT_POLICY = .{
+        .accent_state = .ACCENT_ENABLE_TRANSPARENTGRADIENT,
+        .accent_flags = 2,
+        .gradient_color = 0,
+        .animation_id = 0,
+    };
+
+    const attribData: WINDOWCOMPOSITIONATTRIBDATA = .{
+        .Attrib = .WCA_ACCENT_POLICY,
+        .pvData = &accentPolicy,
+        .cbData = @sizeOf(ACCENT_POLICY),
+    };
+
+    _ = SetWindowCompositionAttribute(taskBarHwnd, &attribData);
+}
+
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
     _ = ret_addr;
@@ -67,7 +91,6 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
                 msg.ptr,
                 @intCast(msg.len),
                 &writtenBytes,
-
                 null,
             );
         }
