@@ -15,4 +15,4 @@ jobs:
       - name: build 
         run: | 
           mkdir zig-out
-          zig build-exe -target=x86_64-windows -femit-bin=zig-out/transparenZ.exe
+          zig build-exe -target x86_64-windows -femit-bin=zig-out/transparenZ.exe
