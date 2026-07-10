@@ -1,0 +1,16 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs: 
+  ci:
+    runs-on: ubunut-latest
+
+    steps: 
+      - uses: actions/checkout@v4
+
+      - name: set up zig
+        uses: mlugg/setup-zig@v2
+
+      - name: build 
+        run: zig build-exe -femit-bin=zig-out/transparenZ.exe
