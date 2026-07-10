@@ -2,8 +2,6 @@ const std = @import("std");
 
 const windows = std.os.windows;
 
-const utlralight = @import("utlralight");
-
 const LPDWORD = *windows.DWORD;
 
 const BOOL = c_int;
@@ -19,6 +17,7 @@ const ACCENT_STATE = enum(u32) {
     ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
     ACCENT_ENABLE_BLURBEHIND = 3,
     ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,
+
     ACCENT_INVALID_STATE = 5,
 };
 
@@ -35,22 +34,6 @@ const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
     cbData: c_uint,
 };
 
-extern "kernel32" fn LoadLibraryW(lpLibFileName: windows.LPCSTR) callconv(.winapi) ?windows.HMODULE;
-
-extern "kernel32" fn FreeLibrary(hLibModule: windows.HMODULE) callconv(.winapi) BOOL;
-
-extern "kernel32" fn GetProcAddress(
-    hModule: windows.HMODULE,
-    lcProcName: windows.LPCSTR,
-) callconv(.winapi) ?windows.FARPROC;
-
-extern "kernel32" fn GetStdHandle(nStdHandle: windows.DWORD) callconv(.winapi) ?windows.HANDLE;
-
-extern "kernel32" fn FindWindowW(
-    lpClassName: windows.LPCWSTR,
-    lpWindowName: ?windows.LPCWSTR,
-) callconv(.winapi) ?windows.HWND;
-
 extern "kernel32" fn WriteFile(
     hFile: windows.HANDLE,
     lpBuffer: windows.LPCVOID,
@@ -59,7 +42,14 @@ extern "kernel32" fn WriteFile(
     lpOverlapped: ?*anyopaque,
 ) callconv(.winapi) BOOL;
 
-const SetWindowCompositionAttributeType = *const fn (
+extern "kernel32" fn GetStdHandle(nStdHandle: windows.DWORD) callconv(.winapi) ?windows.HANDLE;
+
+extern "user32" fn FindWindowW(
+    lpClassName: windows.LPCWSTR,
+    lpWindowName: ?windows.LPCWSTR,
+) callconv(.winapi) ?windows.HWND;
+
+extern "user32" fn SetWindowCompositionAttribute(
     hwnd: windows.HWND,
     pwcad: *const WINDOWCOMPOSITIONATTRIBDATA,
 ) callconv(.winapi) BOOL;
@@ -68,7 +58,7 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
     _ = trace;
     _ = ret_addr;
 
-    // Safe writing without allocations
+    // Safe stderr writing without allocations
     if (GetStdHandle(STD_ERROR_HANDLE)) |handle| {
         if (handle != windows.INVALID_HANDLE_VALUE) {
             var writtenBytes: windows.DWORD = 0;
@@ -77,6 +67,7 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
                 msg.ptr,
                 @intCast(msg.len),
                 &writtenBytes,
+
                 null,
             );
         }
