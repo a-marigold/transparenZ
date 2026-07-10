@@ -22,6 +22,8 @@ jobs:
       - name: build
         run: | 
           FLAGS="src/main.zig -O ReleaseFast -fsingle-threaded -fno-unwind-tables -fstrip"
+
+          mkdir zig-out
           
           zig build-exe -target x86_64-windows -femit-bin='zig-out/x86_64-transparenZ.exe'
 

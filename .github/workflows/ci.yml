@@ -13,4 +13,6 @@ jobs:
         uses: mlugg/setup-zig@v2
 
       - name: build 
-        run: zig build-exe -femit-bin=zig-out/transparenZ.exe
+        run: | 
+          mkdir zig-out
+          zig build-exe -target=x86_64-windows -femit-bin=zig-out/transparenZ.exe
