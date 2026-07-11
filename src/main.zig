@@ -4,7 +4,19 @@ const zigWin = std.os.windows;
 
 const win = @import("win.zig");
 
-const xamlDllPath = "xaml.dll";
+const constants = @import("constants.zig");
+
+const AbsPath = struct {
+    buffer: [win.MAX_WIN_PATH_SIZE]zigWin.WCHAR,
+    /// Length of path in `buffer`, including the Null Terminator.
+    len: zigWin.DWORD,
+};
+
+/// Microsoft docs have no exact error related with `GetFullPathNameW`,
+/// so it has just `Fail` variant.
+const AbsPathError = error{
+    Fail,
+};
 
 pub fn main() void {
     const taskBarHwnd = win.FindWindowExW(
@@ -18,6 +30,8 @@ pub fn main() void {
 
     var explorerProcessId: zigWin.DWORD = 0;
     if (win.GetWindowThreadProcessId(taskBarHwnd, &explorerProcessId) == win.FALSE) {
+        @branchHint(.cold);
+
         @panic("Unable to get 'explorer.exe' pid.");
     }
 
@@ -62,23 +76,43 @@ pub fn main() void {
     );
 }
 
+inline fn getAbsPath(path: zigWin.LPCWSTR) AbsPathError!AbsPath {
+    const buffer: AbsPath.buffer = undefined;
+
+    const absPathLen = win.GetFullPathNameW(
+        path,
+        win.MAX_WIN_PATH_SIZE,
+        &buffer,
+        null,
+    ) + 1; // Include the Null Terminator
+
+    if (absPathLen == 0) {
+        return AbsPathError.Fail;
+    }
+
+    return .{ .buffer = buffer, .len = absPathLen };
+}
+
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
+
     _ = ret_addr;
 
     // Safe stderr writing without allocations
     if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
+        @branchHint(.likely);
+
         if (handle != zigWin.INVALID_HANDLE_VALUE) {
             var writtenBytes: zigWin.DWORD = 0;
             _ = win.WriteFile(
                 handle,
                 msg.ptr,
+
                 @intCast(msg.len),
                 &writtenBytes,
                 null,
             );
         }
     }
-
     @trap();
 }
