@@ -4,6 +4,12 @@
 
 pub const zigWin = @import("std").os.windows;
 
+/// Maximum windows path size in bytes.
+pub const MAX_WIN_PATH_SIZE = 255 * @sizeOf(zigWin.WCHAR);
+
+/// The windows class name of task bar.
+pub const TASK_BAR_CLASS_NAME = "Shell_TrayWnd";
+
 pub const LPDWORD = *zigWin.DWORD;
 pub const BOOL = c_int;
 pub const FALSE: BOOL = 0;
@@ -79,3 +85,17 @@ pub extern "kernel32" fn CreateRemoteThread(
 ) callconv(.winapi) zigWin.HANDLE;
 
 pub extern "kernel32" fn LoadLibraryW(lpLibFileName: zigWin.LPCWSTR) callconv(.winapi) zigWin.HMODULE;
+
+pub extern "kernel32" fn GetFullPathNameW(
+    lpFileName: zigWin.LPCWSTR,
+    nBufferLength: zigWin.DWORD,
+    lpBuffer: ?zigWin.LPWSTR,
+    lpFilePart: ?*zigWin.LPWSTR,
+) callconv(.winapi) zigWin.DWORD;
+
+pub extern "user32" fn MessageBoxA(
+    hWnd: ?zigWin.HWND,
+    lpText: zigWin.LPCSTR,
+    lpCaption: ?zigWin.LPCSTR,
+    uType: zigWin.UINT,
+) callconv(.winapi) c_int;

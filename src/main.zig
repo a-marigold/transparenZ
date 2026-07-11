@@ -1,5 +1,5 @@
 const std = @import("std");
-
+const unicode = std.unicode;
 const zigWin = std.os.windows;
 
 const win = @import("win.zig");
@@ -19,60 +19,78 @@ const AbsPathError = error{
 };
 
 pub fn main() void {
-    const taskBarHwnd = win.FindWindowExW(
-        null,
-        null,
-        std.unicode.utf8ToUtf16LeStringLiteral("Shell_TrayWnd"),
-        null,
+    const explorerProcess = getProcess(
+        unicode.utf8ToUtf16LeStringLiteral(win.TASK_BAR_CLASS_NAME),
+        win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE | win.PROCESS_CREATE_THREAD,
     ) orelse {
-        @panic("Unable to find 'Shell_TrayWnd' window.");
+        @panic("Unable to open 'explorer.exe' process.");
     };
 
-    var explorerProcessId: zigWin.DWORD = 0;
-    if (win.GetWindowThreadProcessId(taskBarHwnd, &explorerProcessId) == win.FALSE) {
+    const uiDllAbsPath = getAbsPath(
+        unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_PATH),
+    ) catch {
         @branchHint(.cold);
 
-        @panic("Unable to get 'explorer.exe' pid.");
-    }
-
-    const explorerProcess = win.OpenProcess(
-        win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE,
-        0,
-        explorerProcessId,
-    ) orelse {
-        @panic("Unable to call 'OpenProcess' with 'explorer.exe' pid.");
+        @panic("Unable to get absolute path of './" ++ constants.UI_DLL_PATH ++ "'.");
     };
 
-    const xamlDllPathAddress = win.VirtualAllocEx(
+    const uiDllPathAddress = win.VirtualAllocEx(
         explorerProcess,
         null,
-        @sizeOf(@TypeOf(xamlDllPath)),
+        uiDllAbsPath.len * zigWin.WCHAR,
         win.MEM_RESERVE | win.MEM_COMMIT,
         win.PAGE_READWRITE,
     ) orelse {
-        @panic("Unable to allocate 'xaml.dll' path string.");
+        @panic("Unable to allocate '" ++ constants.UI_DLL_PATH ++ "'' path string.");
     };
 
-    const writtenBytes = 0;
+    var writtenBytes: zigWin.SIZE_T = 0;
+
     if (win.WriteProcessMemory(
         explorerProcess,
-        xamlDllPathAddress,
-        xamlDllPath,
-        @sizeOf(@TypeOf(xamlDllPath)),
+        uiDllPathAddress,
+        constants.UI_DLL_PATH,
+        @sizeOf(@TypeOf(constants.UI_DLL_PATH)),
 
         &writtenBytes,
     ) == win.FALSE) {
-        @panic("Unable to write 'xaml.dll' path string memory.");
+        @panic("Unable to write '" ++ constants.UI_DLL_PATH ++ "' path string memory.");
     }
 
     _ = win.CreateRemoteThread(
         explorerProcess,
         null,
         0,
-        win.LoadLibraryW,
-        xamlDllPathAddress,
+        @ptrCast(&win.LoadLibraryW),
+        uiDllPathAddress,
         0,
         null,
+    );
+}
+
+/// Opens process which owns the window of `windowClassName`.
+/// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
+///
+/// Returns `zigWin.HANDLE` to process, or in case of error returns `null`.
+inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DWORD) ?zigWin.HANDLE {
+    const hwnd = win.FindWindowExW(
+        null,
+        null,
+        windowClassName,
+        null,
+    ) orelse {
+        return null;
+    };
+
+    var pid: zigWin.DWORD = 0;
+    if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
+        return null;
+    }
+
+    return win.OpenProcess(
+        dwDesiredAccess,
+        win.FALSE,
+        pid,
     );
 }
 
@@ -85,7 +103,6 @@ inline fn getAbsPath(path: zigWin.LPCWSTR) AbsPathError!AbsPath {
         &buffer,
         null,
     ) + 1; // Include the Null Terminator
-
     if (absPathLen == 0) {
         return AbsPathError.Fail;
     }
@@ -95,7 +112,6 @@ inline fn getAbsPath(path: zigWin.LPCWSTR) AbsPathError!AbsPath {
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
-
     _ = ret_addr;
 
     // Safe stderr writing without allocations
