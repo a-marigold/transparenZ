@@ -12,12 +12,6 @@ const AbsPath = struct {
     len: zigWin.DWORD,
 };
 
-/// Microsoft docs have no exact error related with `GetFullPathNameW`,
-/// so it has just `Fail` variant.
-const AbsPathError = error{
-    Fail,
-};
-
 pub fn main() void {
     const explorerProcess = getProcess(
         unicode.utf8ToUtf16LeStringLiteral(win.TASK_BAR_CLASS_NAME),
@@ -28,7 +22,7 @@ pub fn main() void {
 
     const uiDllAbsPath = getAbsPath(
         unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_PATH),
-    ) catch {
+    ) orelse {
         @branchHint(.cold);
 
         @panic("Unable to get absolute path of './" ++ constants.UI_DLL_PATH ++ "'.");
@@ -84,17 +78,20 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 
     var pid: zigWin.DWORD = 0;
     if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
+        @branchHint(.cold);
         return null;
     }
 
     return win.OpenProcess(
         dwDesiredAccess,
         win.FALSE,
+
         pid,
     );
 }
 
-inline fn getAbsPath(path: zigWin.LPCWSTR) AbsPathError!AbsPath {
+/// Returns `AbsPath` struct or `null` in case of error.
+inline fn getAbsPath(path: zigWin.LPCWSTR) ?AbsPath {
     const buffer: AbsPath.buffer = undefined;
 
     const absPathLen = win.GetFullPathNameW(
@@ -103,8 +100,11 @@ inline fn getAbsPath(path: zigWin.LPCWSTR) AbsPathError!AbsPath {
         &buffer,
         null,
     ) + 1; // Include the Null Terminator
+
     if (absPathLen == 0) {
-        return AbsPathError.Fail;
+        @branchHint(.cold);
+
+        return null;
     }
 
     return .{ .buffer = buffer, .len = absPathLen };
@@ -112,6 +112,7 @@ inline fn getAbsPath(path: zigWin.LPCWSTR) AbsPathError!AbsPath {
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
+
     _ = ret_addr;
 
     // Safe stderr writing without allocations
