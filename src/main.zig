@@ -7,7 +7,11 @@ const win = @import("win.zig");
 const constants = @import("constants.zig");
 
 const AbsPath = struct {
+    /// `buffer.len` does not represent the real length of path.
+    ///
+    /// Use `AbsPath.len` instead.
     buffer: [win.MAX_WIN_PATH_SIZE]zigWin.WCHAR,
+
     /// Length of path in `buffer`, including the Null Terminator.
     len: zigWin.DWORD,
 };
@@ -28,35 +32,18 @@ pub fn main() void {
         @panic("Unable to get absolute path of './" ++ constants.UI_DLL_PATH ++ "'.");
     };
 
-    const uiDllPathAddress = win.VirtualAllocEx(
+    const uiDllAbsPathStartAddress = allocWriteProcessMemory(
+        &uiDllAbsPath.buffer,
+        &uiDllAbsPath.len * zigWin.WCHAR,
         explorerProcess,
-        null,
-        uiDllAbsPath.len * zigWin.WCHAR,
-        win.MEM_RESERVE | win.MEM_COMMIT,
-        win.PAGE_READWRITE,
-    ) orelse {
-        @panic("Unable to allocate '" ++ constants.UI_DLL_PATH ++ "'' path string.");
-    };
-
-    var writtenBytes: zigWin.SIZE_T = 0;
-
-    if (win.WriteProcessMemory(
-        explorerProcess,
-        uiDllPathAddress,
-        constants.UI_DLL_PATH,
-        @sizeOf(@TypeOf(constants.UI_DLL_PATH)),
-
-        &writtenBytes,
-    ) == win.FALSE) {
-        @panic("Unable to write '" ++ constants.UI_DLL_PATH ++ "' path string memory.");
-    }
+    );
 
     _ = win.CreateRemoteThread(
         explorerProcess,
         null,
         0,
         @ptrCast(&win.LoadLibraryW),
-        uiDllPathAddress,
+        uiDllAbsPathStartAddress,
         0,
         null,
     );
@@ -88,6 +75,37 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 
         pid,
     );
+}
+
+/// Allocates memory in process of `processHandler` and then writes it with `data`.
+///
+/// Returns start address of allocated memory or `null` in case of error.
+inline fn allocWriteProcessMemory(
+    data: *anyopaque,
+    /// Size in bytes
+    size: zigWin.SIZE_T,
+    processHandle: zigWin.HANDLE,
+) ?zigWin.LPVOID {
+    const startAddress = win.VirtualAllocEx(
+        processHandle,
+        null,
+        size,
+        win.MEM_RESERVE | win.MEM_COMMIT,
+        win.PAGE_READWRITE,
+    ) orelse {
+        return null;
+    };
+
+    if (win.WriteProcessMemory(
+        processHandle,
+        startAddress,
+        data,
+        size,
+        null,
+    ) == win.FALSE) {
+        return null;
+    }
+    return startAddress;
 }
 
 /// Returns `AbsPath` struct or `null` in case of error.
