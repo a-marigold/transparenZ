@@ -21,13 +21,10 @@ jobs:
 
       - name: build
         run: | 
-          FLAGS="src/main.zig -O ReleaseFast -fsingle-threaded -fno-unwind-tables -fstrip"
-
           mkdir zig-out
-          
-          zig build-exe -target x86_64-windows -femit-bin='zig-out/x86_64-transparenZ.exe'
 
-          zig build-exe -target aarch64-windows -femit-bin='zig-out/aarch64-transparenZ.exe'
+          ./build.sh x86_64-windows x86_64-transparenZ.tar.gz
+          ./build.sh aarch-64-windows aarch64-transparenZ.tar.gz
 
       - name: create draft
         uses: softprops/action-gh-release@v2
@@ -36,4 +33,5 @@ jobs:
           draft: true
           generate_release_notes: false
           files: |
-            zig-out/*.exe
+            x86_64-transparenZ.tar.gz
+            aarch64-transparenZ.tar.gz
