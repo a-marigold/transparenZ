@@ -71,7 +71,7 @@ pub extern "kernel32" fn WriteProcessMemory(
     lpBaseAddress: zigWin.LPVOID,
     lpBuffer: zigWin.LPCVOID,
     nSize: zigWin.SIZE_T,
-    lpNumberOfBytesWritten: *zigWin.SIZE_T,
+    lpNumberOfBytesWritten: ?*zigWin.SIZE_T,
 ) callconv(.winapi) BOOL;
 
 pub extern "kernel32" fn CreateRemoteThread(

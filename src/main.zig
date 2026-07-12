@@ -21,6 +21,8 @@ pub fn main() void {
         unicode.utf8ToUtf16LeStringLiteral(win.TASK_BAR_CLASS_NAME),
         win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE | win.PROCESS_CREATE_THREAD,
     ) orelse {
+        @branchHint(.cold);
+
         @panic("Unable to open 'explorer.exe' process.");
     };
 
@@ -34,9 +36,13 @@ pub fn main() void {
 
     const uiDllAbsPathStartAddress = allocWriteProcessMemory(
         &uiDllAbsPath.buffer,
-        &uiDllAbsPath.len * zigWin.WCHAR,
+        &uiDllAbsPath.len * @sizeOf(zigWin.WCHAR),
         explorerProcess,
-    );
+    ) orelse {
+        @branchHint(.cold);
+
+        @panic("Unable to allocate '" ++ constants.UI_DLL_PATH ++ "' string in explorer.exe.");
+    };
 
     _ = win.CreateRemoteThread(
         explorerProcess,
@@ -105,6 +111,7 @@ inline fn allocWriteProcessMemory(
     ) == win.FALSE) {
         return null;
     }
+
     return startAddress;
 }
 
