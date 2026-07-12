@@ -10,7 +10,7 @@ const AbsPath = struct {
     /// `buffer.len` does not represent the real length of path.
     ///
     /// Use `AbsPath.len` instead.
-    buffer: [win.MAX_WIN_PATH_SIZE]zigWin.WCHAR,
+    buffer: [zigWin.MAX_PATH:0]zigWin.WCHAR,
 
     /// Length of path in `buffer`, including the Null Terminator.
     len: zigWin.DWORD,
@@ -26,27 +26,31 @@ pub fn main() void {
         @panic("Unable to open 'explorer.exe' process.");
     };
 
-    var uiDllAbsPath = getAbsPath(
-        unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_PATH),
+    var exeDirPath = getExeDirPath(
+        unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
     ) orelse {
         @branchHint(.cold);
 
-        @panic("Unable to get absolute path of './" ++ constants.UI_DLL_PATH ++ "'.");
+        @panic("Unable to get path of the executable.");
     };
 
-    const uiDllAbsPathStartAddress = allocWriteProcessMemory(
-        &uiDllAbsPath.buffer,
-        uiDllAbsPath.len * @sizeOf(zigWin.WCHAR),
+    std.debug.print(
+        "path {any}\n len {}\n",
+        .{ exeDirPath.buffer[0..exeDirPath.len], exeDirPath.len },
+    );
+
+    const uiDllPathStartAddress = allocWriteProcessMemory(
+        &exeDirPath.buffer,
+        exeDirPath.len * @sizeOf(zigWin.WCHAR),
         explorerProcess,
     ) orelse {
         @branchHint(.cold);
 
-        @panic("Unable to allocate '" ++ constants.UI_DLL_PATH ++ "' string in explorer.exe.");
+        @panic("Unable to allocate '" ++ constants.UI_DLL_FILE_NAME ++ "' string in explorer.exe.");
     };
 
     const loadLibraryAddress = win.GetProcAddress(
-        win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32")),
-
+        win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
         "LoadLibraryW",
     );
 
@@ -55,7 +59,7 @@ pub fn main() void {
         null,
         0,
         @ptrCast(loadLibraryAddress),
-        uiDllAbsPathStartAddress,
+        uiDllPathStartAddress,
         0,
         null,
     );
@@ -93,7 +97,7 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
     );
 }
 
-/// Allocates memory in process of `processHandler` and then writes it with `data`.
+/// Allocates memory in process of `processHandler` and then writes `data` there.
 ///
 /// Returns start address of allocated memory or `null` in case of error.
 inline fn allocWriteProcessMemory(
@@ -126,15 +130,14 @@ inline fn allocWriteProcessMemory(
 }
 
 /// Returns `AbsPath` struct or `null` in case of error.
-inline fn getAbsPath(path: zigWin.LPCWSTR) ?AbsPath {
+///
+/// Returned `len` does includes `\` char of `buffer`.
+///
+/// (it means `result.buffer[result.len - 1]` retrieves `\`).
+inline fn getExeDirPath() ?AbsPath {
     var buffer: @FieldType(AbsPath, "buffer") = undefined;
 
-    const absPathLen = win.GetFullPathNameW(
-        path,
-        win.MAX_WIN_PATH_SIZE,
-        @ptrCast(&buffer),
-        null,
-    ) + 1; // Include the Null Terminator
+    const absPathLen = win.GetModuleFileNameW(null, &buffer, buffer.len);
 
     if (absPathLen == 0) {
         @branchHint(.cold);
@@ -142,11 +145,19 @@ inline fn getAbsPath(path: zigWin.LPCWSTR) ?AbsPath {
         return null;
     }
 
-    return .{ .buffer = buffer, .len = absPathLen };
+    var pathIndex = absPathLen - 1;
+    while (pathIndex < 0) : (pathIndex -= 1) {
+        if (buffer[pathIndex] == constants.UTF16_BACK_SLASH) {
+            break;
+        }
+    }
+
+    return .{ .buffer = buffer, .len = pathIndex };
 }
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
+
     _ = ret_addr;
 
     // Safe stderr writing without allocations
