@@ -29,7 +29,6 @@ pub fn main() void {
 
         @panic("Unable to open 'explorer.exe' process.");
     };
-
     var exeDirPath = getExeDirPath(
         unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
     ) orelse {
@@ -37,6 +36,8 @@ pub fn main() void {
 
         @panic("Unable to get path of the executable.");
     };
+
+    exeDirPathToUiDllPAth(exeDirPath);
 
     std.debug.print(
         "path {any}\n len {}\n",
@@ -135,7 +136,7 @@ inline fn allocWriteProcessMemory(
 
 /// Returns `AbsPath` struct or `null` in case of error.
 ///
-/// Returned `len` **doesn't** include trailing `\` of path char in `buffer`.
+/// Returned `len` **doesn't** include trailing backslash (`\`) of path char in `buffer`.
 ///
 /// (it means `result.buffer[result.len - 1]` **doesn't** retrieves `\`).
 inline fn getExeDirPath() ?AbsPath {
@@ -160,6 +161,17 @@ inline fn getExeDirPath() ?AbsPath {
     return .{ .buffer = buffer, .len = pathIndex };
 }
 
+/// Mutates `exeDirPath.buffer` via copying and appending `constants.UI_DLL_FILE_NAME` there.
+///
+/// Example:
+/// After function call `exeDirPath` contains `...\somePath\ui.dll`.
+inline fn exeDirPathToUiDllPAth(exeDirPath: *AbsPath) void {
+    const uiDllPath = comptime "\\" ++ constants.UI_DLL_FILE_NAME;
+
+    @memcpy(&exeDirPath.buffer[exeDirPath.len], &uiDllPath);
+    exeDirPath.len += uiDllPath.len;
+}
+
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
 
@@ -174,7 +186,6 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
             _ = win.WriteFile(
                 handle,
                 msg.ptr,
-
                 @intCast(msg.len),
                 &writtenBytes,
                 null,
