@@ -26,7 +26,7 @@ pub fn main() void {
         @panic("Unable to open 'explorer.exe' process.");
     };
 
-    const uiDllAbsPath = getAbsPath(
+    var uiDllAbsPath = getAbsPath(
         unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_PATH),
     ) orelse {
         @branchHint(.cold);
@@ -36,7 +36,7 @@ pub fn main() void {
 
     const uiDllAbsPathStartAddress = allocWriteProcessMemory(
         &uiDllAbsPath.buffer,
-        &uiDllAbsPath.len * @sizeOf(zigWin.WCHAR),
+        uiDllAbsPath.len * @sizeOf(zigWin.WCHAR),
         explorerProcess,
     ) orelse {
         @branchHint(.cold);
@@ -44,11 +44,17 @@ pub fn main() void {
         @panic("Unable to allocate '" ++ constants.UI_DLL_PATH ++ "' string in explorer.exe.");
     };
 
+    const loadLibraryAddress = win.GetProcAddress(
+        win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32")),
+
+        "LoadLibraryW",
+    );
+
     _ = win.CreateRemoteThread(
         explorerProcess,
         null,
         0,
-        @ptrCast(&win.LoadLibraryW),
+        @ptrCast(loadLibraryAddress),
         uiDllAbsPathStartAddress,
         0,
         null,
@@ -66,17 +72,21 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
         windowClassName,
         null,
     ) orelse {
+        @branchHint(.cold);
+
         return null;
     };
 
     var pid: zigWin.DWORD = 0;
     if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
         @branchHint(.cold);
+
         return null;
     }
 
     return win.OpenProcess(
         dwDesiredAccess,
+
         win.FALSE,
 
         pid,
@@ -117,12 +127,12 @@ inline fn allocWriteProcessMemory(
 
 /// Returns `AbsPath` struct or `null` in case of error.
 inline fn getAbsPath(path: zigWin.LPCWSTR) ?AbsPath {
-    const buffer: AbsPath.buffer = undefined;
+    var buffer: @FieldType(AbsPath, "buffer") = undefined;
 
     const absPathLen = win.GetFullPathNameW(
         path,
         win.MAX_WIN_PATH_SIZE,
-        &buffer,
+        @ptrCast(&buffer),
         null,
     ) + 1; // Include the Null Terminator
 
@@ -137,7 +147,6 @@ inline fn getAbsPath(path: zigWin.LPCWSTR) ?AbsPath {
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
-
     _ = ret_addr;
 
     // Safe stderr writing without allocations
@@ -156,5 +165,6 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
             );
         }
     }
+
     @trap();
 }
