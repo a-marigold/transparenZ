@@ -10,6 +10,10 @@ const AbsPath = struct {
     /// `buffer.len` does not represent the real length of path.
     ///
     /// Use `AbsPath.len` instead.
+    ///
+    ///
+    ///
+    /// Everything that is after `AbsPath.buffer[AbsPath.len - 1]` is a stack garbage.
     buffer: [zigWin.MAX_PATH:0]zigWin.WCHAR,
 
     /// Length of path in `buffer`, including the Null Terminator.
@@ -131,9 +135,9 @@ inline fn allocWriteProcessMemory(
 
 /// Returns `AbsPath` struct or `null` in case of error.
 ///
-/// Returned `len` does includes `\` char of `buffer`.
+/// Returned `len` **doesn't** include trailing `\` of path char in `buffer`.
 ///
-/// (it means `result.buffer[result.len - 1]` retrieves `\`).
+/// (it means `result.buffer[result.len - 1]` **doesn't** retrieves `\`).
 inline fn getExeDirPath() ?AbsPath {
     var buffer: @FieldType(AbsPath, "buffer") = undefined;
 
@@ -146,6 +150,7 @@ inline fn getExeDirPath() ?AbsPath {
     }
 
     var pathIndex = absPathLen - 1;
+
     while (pathIndex < 0) : (pathIndex -= 1) {
         if (buffer[pathIndex] == constants.UTF16_BACK_SLASH) {
             break;
