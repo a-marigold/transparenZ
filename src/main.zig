@@ -12,11 +12,10 @@ const AbsPath = struct {
     /// Use `AbsPath.len` instead.
     ///
     ///
-    ///
     /// Everything that is after `AbsPath.buffer[AbsPath.len - 1]` is a stack garbage.
     buffer: [zigWin.MAX_PATH:0]zigWin.WCHAR,
 
-    /// Length of path in `buffer`, including the Null Terminator.
+    /// Length of path in `buffer`.
     len: zigWin.DWORD,
 };
 
@@ -29,24 +28,20 @@ pub fn main() void {
 
         @panic("Unable to open 'explorer.exe' process.");
     };
-    var exeDirPath = getExeDirPath(
-        unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
-    ) orelse {
+
+    var exeDirPath = getExeDirPath() orelse {
         @branchHint(.cold);
 
-        @panic("Unable to get path of the executable.");
+        @panic("Unable to get path to the 'transparenZ' executable.");
     };
 
-    exeDirPathToUiDllPAth(exeDirPath);
-
-    std.debug.print(
-        "path {any}\n len {}\n",
-        .{ exeDirPath.buffer[0..exeDirPath.len], exeDirPath.len },
-    );
+    exeDirPathToUiDllPath(&exeDirPath);
+    var uiDllPath = exeDirPath;
 
     const uiDllPathStartAddress = allocWriteProcessMemory(
-        &exeDirPath.buffer,
-        exeDirPath.len * @sizeOf(zigWin.WCHAR),
+        &uiDllPath.buffer,
+
+        uiDllPath.len * @sizeOf(zigWin.WCHAR),
         explorerProcess,
     ) orelse {
         @branchHint(.cold);
@@ -54,7 +49,7 @@ pub fn main() void {
         @panic("Unable to allocate '" ++ constants.UI_DLL_FILE_NAME ++ "' string in explorer.exe.");
     };
 
-    const loadLibraryAddress = win.GetProcAddress(
+    const loadLibraryWAddress = win.GetProcAddress(
         win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
         "LoadLibraryW",
     );
@@ -63,7 +58,7 @@ pub fn main() void {
         explorerProcess,
         null,
         0,
-        @ptrCast(loadLibraryAddress),
+        @ptrCast(loadLibraryWAddress),
         uiDllPathStartAddress,
         0,
         null,
@@ -95,9 +90,7 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 
     return win.OpenProcess(
         dwDesiredAccess,
-
         win.FALSE,
-
         pid,
     );
 }
@@ -106,7 +99,7 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 ///
 /// Returns start address of allocated memory or `null` in case of error.
 inline fn allocWriteProcessMemory(
-    data: *anyopaque,
+    data: *const anyopaque,
     /// Size in bytes
     size: zigWin.SIZE_T,
     processHandle: zigWin.HANDLE,
@@ -152,7 +145,7 @@ inline fn getExeDirPath() ?AbsPath {
 
     var pathIndex = absPathLen - 1;
 
-    while (pathIndex < 0) : (pathIndex -= 1) {
+    while (pathIndex > 0) : (pathIndex -= 1) {
         if (buffer[pathIndex] == constants.UTF16_BACK_SLASH) {
             break;
         }
@@ -163,13 +156,18 @@ inline fn getExeDirPath() ?AbsPath {
 
 /// Mutates `exeDirPath.buffer` via copying and appending `constants.UI_DLL_FILE_NAME` there.
 ///
+/// Also appends Null Terminator to the path.
+///
 /// Example:
-/// After function call `exeDirPath` contains `...\somePath\ui.dll`.
-inline fn exeDirPathToUiDllPAth(exeDirPath: *AbsPath) void {
-    const uiDllPath = comptime "\\" ++ constants.UI_DLL_FILE_NAME;
+///
+/// After function call `exeDirPath.buffer` contains `...\somePath\ui.dll\0`, and `exeDirPath.len` is updated.
+inline fn exeDirPathToUiDllPath(exeDirPath: *AbsPath) void {
+    const uiDllPath = comptime unicode.utf8ToUtf16LeStringLiteral("\\" ++ constants.UI_DLL_FILE_NAME);
 
-    @memcpy(&exeDirPath.buffer[exeDirPath.len], &uiDllPath);
-    exeDirPath.len += uiDllPath.len;
+    @memcpy(exeDirPath.buffer[exeDirPath.len..], uiDllPath);
+
+    exeDirPath.len += uiDllPath.len + 1; // Add 1 for Null Terminator
+    exeDirPath.buffer[exeDirPath.len - 1] = 0; // Add Null Terminator
 }
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
