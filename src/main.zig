@@ -19,9 +19,34 @@ const AbsPath = struct {
     len: zigWin.DWORD,
 };
 
+pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
+    _ = trace;
+
+    _ = ret_addr;
+
+    // Safe stderr writing without allocations
+    if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
+        @branchHint(.likely);
+
+        if (handle != zigWin.INVALID_HANDLE_VALUE) {
+            var writtenBytes: zigWin.DWORD = 0;
+            _ = win.WriteFile(
+                handle,
+                msg.ptr,
+                @intCast(msg.len),
+                &writtenBytes,
+                null,
+            );
+        }
+    }
+
+    @trap();
+}
+
 pub fn main() void {
     const explorerProcess = getProcess(
         unicode.utf8ToUtf16LeStringLiteral(win.TASK_BAR_CLASS_NAME),
+
         win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE | win.PROCESS_CREATE_THREAD,
     ) orelse {
         @branchHint(.cold);
@@ -31,7 +56,6 @@ pub fn main() void {
 
     var exeDirPath = getExeDirPath() orelse {
         @branchHint(.cold);
-
         @panic("Unable to get path to the 'transparenZ' executable.");
     };
 
@@ -40,7 +64,6 @@ pub fn main() void {
 
     const uiDllPathStartAddress = allocWriteProcessMemory(
         &uiDllPath.buffer,
-
         uiDllPath.len * @sizeOf(zigWin.WCHAR),
         explorerProcess,
     ) orelse {
@@ -53,7 +76,6 @@ pub fn main() void {
         win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
         "LoadLibraryW",
     );
-
     _ = win.CreateRemoteThread(
         explorerProcess,
         null,
@@ -90,7 +112,9 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 
     return win.OpenProcess(
         dwDesiredAccess,
+
         win.FALSE,
+
         pid,
     );
 }
@@ -167,29 +191,6 @@ inline fn exeDirPathToUiDllPath(exeDirPath: *AbsPath) void {
     @memcpy(exeDirPath.buffer[exeDirPath.len..], uiDllPath);
 
     exeDirPath.len += uiDllPath.len + 1; // Add 1 for Null Terminator
+
     exeDirPath.buffer[exeDirPath.len - 1] = 0; // Add Null Terminator
-}
-
-pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    _ = trace;
-
-    _ = ret_addr;
-
-    // Safe stderr writing without allocations
-    if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
-        @branchHint(.likely);
-
-        if (handle != zigWin.INVALID_HANDLE_VALUE) {
-            var writtenBytes: zigWin.DWORD = 0;
-            _ = win.WriteFile(
-                handle,
-                msg.ptr,
-                @intCast(msg.len),
-                &writtenBytes,
-                null,
-            );
-        }
-    }
-
-    @trap();
 }
