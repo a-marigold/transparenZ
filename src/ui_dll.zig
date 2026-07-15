@@ -1,6 +1,6 @@
 //! Updates the taskbar UI.
 //!
-//! Injected first to `explorer.exe` and then as DLL for `InitializeXamlDiagnosticsEx`.
+//! First injected to `explorer.exe` and then used as DLL for `InitializeXamlDiagnosticsEx`.
 //!
 //! Compile file must be named `ui.dll` (see the `constants.zig`).
 
@@ -45,15 +45,23 @@ export fn DllMain(
     }
 }
 
-/// Called in `InitializeXamlDiagnosticsEx`.
+/// Called when `InitializeXamlDiagnosticsEx` loads this DLL.
 export fn DllGetClassObject(
     rclsid: *const zigWin.GUID,
     riid: *const zigWin.GUID,
     ppv: *zigWin.LPVOID,
 ) callconv(.winapi) win.HRESULT {
-    _ = rclsid;
-    _ = riid;
-    _ = ppv;
+    // The check is not actually needed
+    // 'cause `DllGetClassObject` is called only by `InitializeXamlDiagnoticsEx`
+    // but it ensures there won't be any problem
+    if (std.mem.eql(
+        std.mem.asBytes(rclsid),
+        std.mem.asBytes(&TAP_SITE_GUID),
+    )) {
+        return tapSite.vtable.QueryInterface(tapSite, riid, ppv);
+    }
+
+    return .CLASS_E_CLASSNOTAVAILABLE;
 }
 
 fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWORD {
@@ -64,7 +72,6 @@ fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWO
         null,
         0,
     );
-    // TODO: free lib
 
     const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
         windowsUiXaml,
@@ -74,7 +81,7 @@ fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWO
 
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
-            // TODO: handle
+            return 0;
         };
 
         utils.exeDirPathToUiDllPath(&exeDirPath);
@@ -91,9 +98,9 @@ fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWO
         constants.TAP_CLSID,
         null,
     );
-}
 
-// TODO: add safety checks
+    return 1;
+}
 
 // Only To test DLL loading
 
