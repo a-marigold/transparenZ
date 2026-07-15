@@ -41,7 +41,10 @@ const TaskbarHook = extern struct {
         return 1;
     }
 };
+
 /// Singleton intended to be located in `.data` instead of heap.
+///
+/// Used to intercept `IXamlDiagnostics` and use it for taskbar customization.
 var taskbarHook: TaskbarHook = .{
     .vtable = &.{
         .QueryInterface = struct {
@@ -59,18 +62,39 @@ var taskbarHook: TaskbarHook = .{
         }.QueryInterface,
 
         .AddRef = TaskbarHook.refManagingFn,
+
         .Release = TaskbarHook.refManagingFn,
 
         .SetSite = struct {
-            fn SetSite(self: *TaskbarHook, pUnkSite: ?*const win.IUnknown) callconv(.winapi) win.HRESULT {}
+            fn SetSite(self: *TaskbarHook, pUnkSite: ?*const win.IUnknown) callconv(.winapi) win.HRESULT {
+                if (pUnkSite) |iUnknown| {
+                    var xamlDiagnosticsInterfacePointer: *taskbarHook.xamlDiagnostcsInterface = undefined;
+
+                    return iUnknown.vtable.QueryInterface(
+                        iUnknown,
+                        &xamlDiagnosticsInterfacePointer,
+                    );
+                }
+
+                self.xamlDiagnostcsInterface = null;
+
+                return .S_OK;
+            }
         }.SetSite,
 
         .GetSite = struct {
             fn GetSite(
-                self: *anyopaque,
+                self: *TaskbarHook,
                 riid: *const zigWin.GUID,
                 ppvSite: **anyopaque,
-            ) callconv(.winapi) win.HRESULT {}
+            ) callconv(.winapi) win.HRESULT {
+                _ = self;
+                _ = riid;
+                _ = ppvSite;
+                // `InitializeXamlDiagnosticsEx` never causes call of `GetSite`
+                // So it is no-op
+                return .E_NOINTERFACE;
+            }
         }.GetSite,
     },
     .xamlDiagnosticsInterface = null,
@@ -94,7 +118,6 @@ export fn DllMain(
                 0,
                 null,
             );
-
             if (thread) |handle| {
                 _ = win.CloseHandle(handle);
 

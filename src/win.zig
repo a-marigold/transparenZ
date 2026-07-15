@@ -12,6 +12,7 @@ pub const WINDOWS_UI_XAML_DLL_NAME = "Windows.UI.Xaml.dll";
 pub const LPDWORD = *zigWin.DWORD;
 
 pub const BOOL = c_int;
+
 pub const FALSE: BOOL = 0;
 pub const TRUE: BOOL = 1;
 
@@ -26,6 +27,7 @@ pub const PROCESS_VM_WRITE = 0x0020;
 
 pub const MEM_RESERVE = 0x00002000;
 pub const MEM_COMMIT = 0x00001000;
+
 pub const PAGE_READWRITE = 0x04;
 
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
@@ -33,7 +35,6 @@ pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;
 
 pub const HRESULT = enum(zigWin.DWORD) {
     S_OK = 0x00000000,
-
     E_NOTIMPL = 0x80004001,
     E_NOINTERFACE = 0x80004002,
     E_POINTER = 0x80004003,
@@ -44,6 +45,7 @@ pub const HRESULT = enum(zigWin.DWORD) {
     E_HANDLE = 0x80070006,
     E_OUTOFMEMORY = 0x8007000E,
     E_INVALIDARG = 0x80070057,
+    CLASS_E_CLASSNOTAVAILABLE = 0x80040111,
 };
 
 pub const ACCENT_STATE = enum(i32) {
@@ -86,9 +88,9 @@ pub const InitializeXamlDiagnosticsEx = fn (
 pub const IUnknown = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
-        QueryInterface: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppv: **anyopaque) callconv(.winapi) HRESULT,
-        AddRef: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
-        Release: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
+        QueryInterface: *const fn (self: *@This(), riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) HRESULT,
+        AddRef: *const fn (self: *@This()) callconv(.winapi) zigWin.ULONG,
+        Release: *const fn (self: *@This()) callconv(.winapi) zigWin.ULONG,
     };
 };
 
@@ -98,8 +100,8 @@ pub const IObjectWithSite = extern struct {
         QueryInterface: IUnknown.VTable.QueryInterface,
         AddRef: IUnknown.VTable.AddRef,
         Release: IUnknown.VTable.Release,
-        SetSite: *const fn (self: *anyopaque, pUnkSite: *const IUnknown) callconv(.winapi) HRESULT,
-        GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
+        SetSite: *const fn (self: *@This(), pUnkSite: *const IUnknown) callconv(.winapi) HRESULT,
+        GetSite: *const fn (self: *@This(), riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
     };
 };
 
