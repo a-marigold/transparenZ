@@ -7,6 +7,8 @@ pub const zigWin = @import("std").os.windows;
 /// The windows class name of task bar.
 pub const TASK_BAR_CLASS_NAME = "Shell_TrayWnd";
 
+pub const WINDOWS_UI_XAML_DLL_NAME = "Windows.UI.Xaml.dll";
+
 pub const LPDWORD = *zigWin.DWORD;
 
 pub const BOOL = c_int;
@@ -24,11 +26,25 @@ pub const PROCESS_VM_WRITE = 0x0020;
 
 pub const MEM_RESERVE = 0x00002000;
 pub const MEM_COMMIT = 0x00001000;
-
 pub const PAGE_READWRITE = 0x04;
 
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
 pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;
+
+pub const HRESULT = enum(zigWin.DWORD) {
+    S_OK = 0x00000000,
+
+    E_NOTIMPL = 0x80004001,
+    E_NOINTERFACE = 0x80004002,
+    E_POINTER = 0x80004003,
+    E_ABORT = 0x80004004,
+    E_FAIL = 0x80004005,
+    E_UNEXPECTED = 0x8000FFFF,
+    E_ACCESSDENIED = 0x80070005,
+    E_HANDLE = 0x80070006,
+    E_OUTOFMEMORY = 0x8007000E,
+    E_INVALIDARG = 0x80070057,
+};
 
 pub const ACCENT_STATE = enum(i32) {
     ACCENT_DISABLED = 0,
@@ -55,6 +71,45 @@ pub const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
     pvData: *const anyopaque,
     cbData: u32,
 };
+
+pub const LOAD_LIBRARY_SEARCH_SYSTEM32: zigWin.DWORD = 0x00000800;
+
+pub const InitializeXamlDiagnosticsEx = fn (
+    endPointName: zigWin.LPCWSTR,
+    pid: zigWin.DWORD,
+    wszDllXamlDiagnostics: zigWin.LPCWSTR,
+    wszTAPDllName: zigWin.LPCWSTR,
+    tapClsid: zigWin.CLSID,
+    wszInitializationData: zigWin.LPCWSTR,
+) callconv(.winapi) HRESULT;
+
+pub const IUnknown = extern struct {
+    vtable: *const VTable,
+    pub const VTable = extern struct {
+        QueryInterface: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppv: **anyopaque) callconv(.winapi) HRESULT,
+        AddRef: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
+        Release: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
+    };
+};
+
+pub const IObjectWithSite = extern struct {
+    vtable: *const VTable,
+    pub const VTable = extern struct {
+        QueryInterface: IUnknown.VTable.QueryInterface,
+        AddRef: IUnknown.VTable.AddRef,
+        Release: IUnknown.VTable.Release,
+        SetSite: *const fn (self: *anyopaque, pUnkSite: *const IUnknown) callconv(.winapi) HRESULT,
+        GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
+    };
+};
+
+pub extern "kernel32" fn LoadLibraryExW(
+    lpLibFileName: zigWin.LPCWSTR,
+    hFile: zigWin.HANDLE,
+    dwFlags: zigWin.DWORD,
+) callconv(.winapi) zigWin.HMODULE;
+
+pub extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) zigWin.DWORD;
 
 pub extern "user32" fn SetWindowCompositionAttribute(
     hwnd: zigWin.HWND,

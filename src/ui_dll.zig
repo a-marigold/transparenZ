@@ -1,13 +1,14 @@
 //! Updates the taskbar UI.
-//! Compiled to windows DLL.
-//! Must be named `ui.dll` (see the `constants.zig`).
+//!
+//! Injected first to `explorer.exe` and then as DLL for `InitializeXamlDiagnosticsEx`.
+//!
+//! Compile file must be named `ui.dll` (see the `constants.zig`).
 
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
 
 const win = @import("win.zig");
-
 const constants = @import("constants.zig");
 
 export fn DllMain(
@@ -24,7 +25,7 @@ export fn DllMain(
             const thread = win.CreateThread(
                 null,
                 0,
-                &updateTaskBar,
+                &initXamlDiagnostics,
                 null,
                 0,
                 null,
@@ -44,11 +45,58 @@ export fn DllMain(
     }
 }
 
-fn updateTaskBar(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWORD {
-    _ = lpParameter;
+/// Called in `InitializeXamlDiagnosticsEx`.
+export fn DllGetClassObject(
+    rclsid: *const zigWin.GUID,
+    riid: *const zigWin.GUID,
+    ppv: *zigWin.LPVOID,
+) callconv(.winapi) win.HRESULT {
+    _ = rclsid;
+    _ = riid;
+    _ = ppv;
 }
 
+fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWORD {
+    _ = lpParameter;
+
+    const windowsUiXaml = win.LoadLibraryExW(
+        unicode.utf8ToUtf16LeStringLiteral(win.WINDOWS_UI_XAML_DLL_NAME),
+        null,
+        0,
+    );
+    // TODO: free lib
+
+    const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
+        windowsUiXaml,
+        "InitializeXamlDiagnostics",
+        win.LOAD_LIBRARY_SEARCH_SYSTEM32,
+    ));
+
+    const uiDllPath = block: {
+        var exeDirPath = utils.getExeDirPath() orelse {
+            // TODO: handle
+        };
+
+        utils.exeDirPathToUiDllPath(&exeDirPath);
+        break :block exeDirPath;
+    };
+
+    _ = initializeXamlDiagnosticsEx(
+        // Random, but unique string
+        unicode.utf8ToUtf16LeStringLiteral("tZy"),
+
+        win.GetCurrentProcessId(),
+        null,
+        uiDllPath,
+        constants.TAP_CLSID,
+        null,
+    );
+}
+
+// TODO: add safety checks
+
 // Only To test DLL loading
+
 extern "kernel32" fn CreateFileW(
     lpFileName: zigWin.LPCWSTR,
     dwDesiredAccess: zigWin.DWORD,
