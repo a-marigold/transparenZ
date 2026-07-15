@@ -11,6 +11,36 @@ const zigWin = std.os.windows;
 const win = @import("win.zig");
 const constants = @import("constants.zig");
 
+const utils = @import("utils.zig");
+
+const TAP_SITE_GUID: zigWin.GUID = .{
+    .Data1 = 0xe59f556e,
+
+    .Data2 = 0x7b96,
+    .Data3 = 0x4620,
+
+    .Data4 = .{ 0xad, 0xf9, 0x19, 0x01, 0x0d, 0xad, 0xb9, 0xad },
+};
+
+const TapSite = extern struct {
+    vtable: win.IObjectWithSite.VTable,
+
+    /// Pointer to `IXamlDiagnostics`.
+    ///
+    /// Initialized in `tapSite.vtable.SetSite`,
+    /// when windows calls this function after executing `DllGetClassObject`.
+    xamlDiagnostcsInterface: ?*anyopaque,
+
+    /// `AddRef` and `Release` no-op implemenation of `tapSite`.
+    ///
+    /// It is no-op 'cause `tapSite` is a singleton and it is useless to manage its lifetime
+    fn refManagingFn(self: *anyopaque) callconv(.winapi) zigWin.ULONG {
+        _ = self;
+
+        // Returning `1` means `tapSite`'s ref count is one
+        return 1;
+    }
+};
 export fn DllMain(
     hinstDLL: zigWin.HINSTANCE,
     fwdReason: zigWin.DWORD,
