@@ -13,7 +13,7 @@ const constants = @import("constants.zig");
 
 const utils = @import("utils.zig");
 
-const TAP_SITE_GUID: zigWin.GUID = .{
+const TASKBAR_HOOK_GUID: zigWin.GUID = .{
     .Data1 = 0xe59f556e,
 
     .Data2 = 0x7b96,
@@ -22,7 +22,7 @@ const TAP_SITE_GUID: zigWin.GUID = .{
     .Data4 = .{ 0xad, 0xf9, 0x19, 0x01, 0x0d, 0xad, 0xb9, 0xad },
 };
 
-const TapSite = extern struct {
+const TaskbarHook = extern struct {
     vtable: win.IObjectWithSite.VTable,
 
     /// Pointer to `IXamlDiagnostics`.
@@ -34,12 +34,46 @@ const TapSite = extern struct {
     /// `AddRef` and `Release` no-op implemenation of `tapSite`.
     ///
     /// It is no-op 'cause `tapSite` is a singleton and it is useless to manage its lifetime
-    fn refManagingFn(self: *anyopaque) callconv(.winapi) zigWin.ULONG {
+    fn refManagingFn(self: *@This()) callconv(.winapi) zigWin.ULONG {
         _ = self;
 
         // Returning `1` means `tapSite`'s ref count is one
         return 1;
     }
+};
+/// Singleton intended to be located in `.data` instead of heap.
+var taskbarHook: TaskbarHook = .{
+    .vtable = &.{
+        .QueryInterface = struct {
+            fn QueryInterface(self: *TaskbarHook, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) win.HRESULT {
+                _ = self;
+
+                if (std.mem.eql(std.mem.asBytes(riid), std.mem.asBytes())) {
+                    ppvObject.* = &taskbarHook;
+
+                    return .S_OK;
+                }
+
+                return .E_NOINTERFACE;
+            }
+        }.QueryInterface,
+
+        .AddRef = TaskbarHook.refManagingFn,
+        .Release = TaskbarHook.refManagingFn,
+
+        .SetSite = struct {
+            fn SetSite(self: *TaskbarHook, pUnkSite: ?*const win.IUnknown) callconv(.winapi) win.HRESULT {}
+        }.SetSite,
+
+        .GetSite = struct {
+            fn GetSite(
+                self: *anyopaque,
+                riid: *const zigWin.GUID,
+                ppvSite: **anyopaque,
+            ) callconv(.winapi) win.HRESULT {}
+        }.GetSite,
+    },
+    .xamlDiagnosticsInterface = null,
 };
 export fn DllMain(
     hinstDLL: zigWin.HINSTANCE,
@@ -86,9 +120,9 @@ export fn DllGetClassObject(
     // but it ensures there won't be any problem
     if (std.mem.eql(
         std.mem.asBytes(rclsid),
-        std.mem.asBytes(&TAP_SITE_GUID),
+        std.mem.asBytes(&TASKBAR_HOOK_GUID),
     )) {
-        return tapSite.vtable.QueryInterface(tapSite, riid, ppv);
+        return taskbarHook.vtable.QueryInterface(taskbarHook, riid, ppv);
     }
 
     return .CLASS_E_CLASSNOTAVAILABLE;
@@ -125,7 +159,7 @@ fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWO
         win.GetCurrentProcessId(),
         null,
         uiDllPath,
-        constants.TAP_CLSID,
+        TASKBAR_HOOK_GUID,
         null,
     );
 
