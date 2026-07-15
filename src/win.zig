@@ -107,7 +107,7 @@ pub const IObjectWithSite = extern struct {
 
 pub extern "kernel32" fn LoadLibraryExW(
     lpLibFileName: zigWin.LPCWSTR,
-    hFile: zigWin.HANDLE,
+    hFile: ?zigWin.HANDLE,
     dwFlags: zigWin.DWORD,
 ) callconv(.winapi) zigWin.HMODULE;
 

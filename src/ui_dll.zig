@@ -58,11 +58,8 @@ export fn DllGetClassObject(
 ) callconv(.winapi) win.HRESULT {
     // The check is not actually needed
     // 'cause `DllGetClassObject` is called only by `InitializeXamlDiagnoticsEx`
-    // but it ensures there won't be any problem
-    if (std.mem.eql(
-        std.mem.asBytes(rclsid),
-        std.mem.asBytes(&TaskbarHook.TASKBAR_HOOK_GUID),
-    )) {
+    // But it ensures there won't be any problem
+    if (std.meta.eql(rclsid.*, TaskbarHook.TASKBAR_HOOK_GUID)) {
         return taskbarHook.vtable.QueryInterface(taskbarHook, riid, ppv);
     }
 
@@ -75,13 +72,12 @@ fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWO
     const windowsUiXaml = win.LoadLibraryExW(
         unicode.utf8ToUtf16LeStringLiteral(win.WINDOWS_UI_XAML_DLL_NAME),
         null,
-        0,
+        win.LOAD_LIBRARY_SEARCH_SYSTEM32,
     );
 
     const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
         windowsUiXaml,
         "InitializeXamlDiagnostics",
-        win.LOAD_LIBRARY_SEARCH_SYSTEM32,
     ));
 
     const uiDllPath = block: {
