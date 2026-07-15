@@ -3,13 +3,12 @@ const unicode = std.unicode;
 const zigWin = std.os.windows;
 
 const win = @import("win.zig");
-
 const constants = @import("constants.zig");
 
 const utils = @import("utils.zig");
+
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
-
     _ = ret_addr;
 
     // Safe stderr writing without allocations
@@ -27,29 +26,29 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
             );
         }
     }
-
     @trap();
 }
 
 pub fn main() void {
     const explorerProcess = getProcess(
         unicode.utf8ToUtf16LeStringLiteral(win.TASK_BAR_CLASS_NAME),
-
         win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE | win.PROCESS_CREATE_THREAD,
     ) orelse {
         @branchHint(.cold);
 
         @panic("Unable to open 'explorer.exe' process.");
     };
-    // TODO: put the logic of ui dll path creation to block
-    var exeDirPath = utils.getExeDirPath() orelse {
-        @branchHint(.cold);
 
-        @panic("Unable to get path to the 'transparenZ' executable.");
+    const uiDllPath = block: {
+        var exeDirPath = utils.getExeDirPath() orelse {
+            @branchHint(.cold);
+
+            @panic("Unable to get path to the 'transparenZ' executable.");
+        };
+
+        utils.exeDirPathToUiDllPath(&exeDirPath);
+        break :block exeDirPath;
     };
-
-    utils.exeDirPathToUiDllPath(&exeDirPath);
-    var uiDllPath = exeDirPath;
 
     const uiDllPathStartAddress = allocWriteProcessMemory(
         &uiDllPath.buffer,
@@ -77,9 +76,12 @@ pub fn main() void {
 }
 
 /// Opens process which owns the window of `windowClassName`.
+///
 /// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
 ///
-/// Returns `zigWin.HANDLE` to process, or in case of error returns `null`.
+/// Caller owns the handle to process.
+///
+/// Returns `zigWin.HANDLE` to the process, or `null` in case of error.
 inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DWORD) ?zigWin.HANDLE {
     const hwnd = win.FindWindowExW(
         null,
@@ -101,9 +103,7 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 
     return win.OpenProcess(
         dwDesiredAccess,
-
         win.FALSE,
-
         pid,
     );
 }
