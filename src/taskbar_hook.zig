@@ -1,3 +1,5 @@
+//! `TaskbarHook` inherited from `IObjectWithSite`.
+
 const TaskbarHook = @This();
 
 const std = @import("std");
@@ -9,13 +11,12 @@ pub const TASKBAR_HOOK_GUID: zigWin.GUID = .{
     .Data1 = 0xe59f556e,
 
     .Data2 = 0x7b96,
-
     .Data3 = 0x4620,
 
     .Data4 = .{ 0xad, 0xf9, 0x19, 0x01, 0x0d, 0xad, 0xb9, 0xad },
 };
 
-vtable: win.IObjectWithSite.VTable,
+vtable: *const win.IObjectWithSite.VTable,
 
 /// Pointer to `IXamlDiagnostics`.
 ///
@@ -26,9 +27,8 @@ xamlDiagnosticsInterface: ?*win.IUnknown,
 /// `AddRef` and `Release` no-op implemenation of `tapSite`.
 ///
 /// It is no-op 'cause `tapSite` is a singleton and it is useless to manage its lifetime
-fn refManagingFn(self: *TaskbarHook) callconv(.winapi) zigWin.ULONG {
+fn refMangingNoopFn(self: *anyopaque) callconv(.winapi) zigWin.ULONG {
     _ = self;
-
     // Returning `1` means `tapSite`'s ref count is one
     return 1;
 }
@@ -39,10 +39,10 @@ fn refManagingFn(self: *TaskbarHook) callconv(.winapi) zigWin.ULONG {
 pub var taskbarHook: TaskbarHook = .{
     .vtable = &.{
         .QueryInterface = struct {
-            fn QueryInterface(self: *TaskbarHook, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) win.HRESULT {
+            fn QueryInterface(self: *anyopaque, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) win.HRESULT {
                 _ = self;
 
-                if (std.meta.eql(riid, __IOBJECTIWTHSITEGUID__)) {
+                if (std.meta.eql(riid.*, win.IID_IObjectWithSite)) {
                     ppvObject.* = &taskbarHook;
 
                     return .S_OK;
@@ -52,25 +52,26 @@ pub var taskbarHook: TaskbarHook = .{
             }
         }.QueryInterface,
 
-        .AddRef = TaskbarHook.refManagingFn,
+        .AddRef = TaskbarHook.refMangingNoopFn,
 
-        .Release = TaskbarHook.refManagingFn,
+        .Release = TaskbarHook.refMangingNoopFn,
 
         .SetSite = struct {
-            fn SetSite(self: *TaskbarHook, pUnkSite: ?*const win.IUnknown) callconv(.winapi) win.HRESULT {
-                if (pUnkSite) |iUnknown| {
-                    var xamlDiagnosticsInterfacePointer: *taskbarHook.xamlDiagnosticsInterface = undefined;
+            fn SetSite(self: *anyopaque, pUnkSite: ?*win.IUnknown) callconv(.winapi) win.HRESULT {
+                const taskbarHookSelf: *TaskbarHook = @ptrCast(@alignCast(self));
 
+                if (pUnkSite) |iUnknown| {
                     return iUnknown.vtable.QueryInterface(
-                        iUnknown,
-                        &xamlDiagnosticsInterfacePointer,
+                        @ptrCast(iUnknown),
+                        &win.IID_IXamlDiagnostics,
+                        @ptrCast(&taskbarHookSelf.xamlDiagnosticsInterface),
                     );
                 }
 
-                if (self.xamlDiagnosticsInterface) |xamlDiagnosticsInterface| {
+                if (taskbarHookSelf.xamlDiagnosticsInterface) |xamlDiagnosticsInterface| {
                     _ = xamlDiagnosticsInterface.vtable.Release(xamlDiagnosticsInterface);
 
-                    self.xamlDiagnosticsInterface = null;
+                    taskbarHookSelf.xamlDiagnosticsInterface = null;
                 }
 
                 return .S_OK;
@@ -79,7 +80,7 @@ pub var taskbarHook: TaskbarHook = .{
 
         .GetSite = struct {
             fn GetSite(
-                self: *TaskbarHook,
+                self: *anyopaque,
                 riid: *const zigWin.GUID,
                 ppvSite: **anyopaque,
             ) callconv(.winapi) win.HRESULT {
