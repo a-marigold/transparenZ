@@ -21,7 +21,7 @@ vtable: win.IObjectWithSite.VTable,
 ///
 /// Initialized in `tapSite.vtable.SetSite`,
 /// when windows calls this function after executing `DllGetClassObject`.
-xamlDiagnostcsInterface: ?*anyopaque,
+xamlDiagnosticsInterface: ?*win.IUnknown,
 
 /// `AddRef` and `Release` no-op implemenation of `tapSite`.
 ///
@@ -42,7 +42,7 @@ pub var taskbarHook: TaskbarHook = .{
             fn QueryInterface(self: *TaskbarHook, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) win.HRESULT {
                 _ = self;
 
-                if (std.mem.eql(std.mem.asBytes(riid), std.mem.asBytes())) {
+                if (std.meta.eql(riid, __IOBJECTIWTHSITEGUID__)) {
                     ppvObject.* = &taskbarHook;
 
                     return .S_OK;
@@ -59,7 +59,7 @@ pub var taskbarHook: TaskbarHook = .{
         .SetSite = struct {
             fn SetSite(self: *TaskbarHook, pUnkSite: ?*const win.IUnknown) callconv(.winapi) win.HRESULT {
                 if (pUnkSite) |iUnknown| {
-                    var xamlDiagnosticsInterfacePointer: *taskbarHook.xamlDiagnostcsInterface = undefined;
+                    var xamlDiagnosticsInterfacePointer: *taskbarHook.xamlDiagnosticsInterface = undefined;
 
                     return iUnknown.vtable.QueryInterface(
                         iUnknown,
@@ -67,7 +67,11 @@ pub var taskbarHook: TaskbarHook = .{
                     );
                 }
 
-                self.xamlDiagnostcsInterface = null;
+                if (self.xamlDiagnosticsInterface) |xamlDiagnosticsInterface| {
+                    _ = xamlDiagnosticsInterface.vtable.Release(xamlDiagnosticsInterface);
+
+                    self.xamlDiagnosticsInterface = null;
+                }
 
                 return .S_OK;
             }
