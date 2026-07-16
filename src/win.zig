@@ -17,6 +17,7 @@ pub const FALSE: BOOL = 0;
 pub const TRUE: BOOL = 1;
 
 pub const WPARAM = zigWin.UINT;
+
 pub const LPARAM = WPARAM;
 
 pub const STD_ERROR_HANDLE: zigWin.DWORD = @bitCast(@as(i32, -12));
@@ -27,6 +28,7 @@ pub const PROCESS_VM_WRITE = 0x0020;
 
 pub const MEM_RESERVE = 0x00002000;
 pub const MEM_COMMIT = 0x00001000;
+
 pub const PAGE_READWRITE = 0x04;
 
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
@@ -75,21 +77,17 @@ pub const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
 
 pub const LOAD_LIBRARY_SEARCH_SYSTEM32: zigWin.DWORD = 0x00000800;
 
-pub const InitializeXamlDiagnosticsEx = fn (
-    endPointName: zigWin.LPCWSTR,
-    pid: zigWin.DWORD,
-    wszDllXamlDiagnostics: zigWin.LPCWSTR,
-    wszTAPDllName: zigWin.LPCWSTR,
-    tapClsid: zigWin.CLSID,
-    wszInitializationData: zigWin.LPCWSTR,
-) callconv(.winapi) HRESULT;
-
 pub const IUnknown = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
-        QueryInterface: *const fn (self: *IUnknown, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) HRESULT,
-        AddRef: *const fn (self: *IUnknown) callconv(.winapi) zigWin.ULONG,
-        Release: *const fn (self: *IUnknown) callconv(.winapi) zigWin.ULONG,
+        // Opaque pointers 'cause this type is used
+        // for imitation of cpp inheritance.
+        // If replace opaques with `IUnknown`,
+        // there are type errors in inherited objects
+
+        QueryInterface: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) HRESULT,
+        AddRef: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
+        Release: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
     };
 };
 
@@ -103,13 +101,33 @@ pub const IID_IObjectWithSite = zigWin.GUID{
 pub const IObjectWithSite = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
+        // Opaque pointers 'cause this type is used
+        // for imitation of cpp inheritance.
+        // If replace opaques with `IObjectWithSite`,
+        // there are type errors in inherited objects
+
         QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
         AddRef: @FieldType(IUnknown.VTable, "AddRef"),
         Release: @FieldType(IUnknown.VTable, "Release"),
-        SetSite: *const fn (self: *IObjectWithSite, pUnkSite: *const IUnknown) callconv(.winapi) HRESULT,
-        GetSite: *const fn (self: *IObjectWithSite, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
+        SetSite: *const fn (self: *anyopaque, pUnkSite: *IUnknown) callconv(.winapi) HRESULT,
+        GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
     };
 };
+pub const IID_IXamlDiagnostics = zigWin.GUID{
+    .Data1 = 0x18c9e2b6,
+    .Data2 = 0x3c43,
+    .Data3 = 0x4116,
+    .Data4 = [_]u8{ 0x9f, 0x87, 0xb1, 0x50, 0x6a, 0x61, 0x72, 0xe8 },
+};
+
+pub const InitializeXamlDiagnosticsEx = fn (
+    endPointName: zigWin.LPCWSTR,
+    pid: zigWin.DWORD,
+    wszDllXamlDiagnostics: ?zigWin.LPCWSTR,
+    wszTAPDllName: zigWin.LPCWSTR,
+    tapClsid: *const zigWin.GUID,
+    wszInitializationData: zigWin.LPCWSTR,
+) callconv(.winapi) HRESULT;
 
 pub extern "kernel32" fn LoadLibraryExW(
     lpLibFileName: zigWin.LPCWSTR,
