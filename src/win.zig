@@ -27,7 +27,6 @@ pub const PROCESS_VM_WRITE = 0x0020;
 
 pub const MEM_RESERVE = 0x00002000;
 pub const MEM_COMMIT = 0x00001000;
-
 pub const PAGE_READWRITE = 0x04;
 
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
@@ -88,20 +87,27 @@ pub const InitializeXamlDiagnosticsEx = fn (
 pub const IUnknown = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
-        QueryInterface: *const fn (self: *@This(), riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) HRESULT,
-        AddRef: *const fn (self: *@This()) callconv(.winapi) zigWin.ULONG,
-        Release: *const fn (self: *@This()) callconv(.winapi) zigWin.ULONG,
+        QueryInterface: *const fn (self: *IUnknown, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) HRESULT,
+        AddRef: *const fn (self: *IUnknown) callconv(.winapi) zigWin.ULONG,
+        Release: *const fn (self: *IUnknown) callconv(.winapi) zigWin.ULONG,
     };
+};
+
+pub const IID_IObjectWithSite = zigWin.GUID{
+    .Data1 = 0xfc4801a3,
+    .Data2 = 0x2ba9,
+    .Data3 = 0x11cf,
+    .Data4 = .{ 0xa2, 0x29, 0x00, 0xaa, 0x00, 0x3d, 0x73, 0x52 },
 };
 
 pub const IObjectWithSite = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
-        QueryInterface: IUnknown.VTable.QueryInterface,
-        AddRef: IUnknown.VTable.AddRef,
-        Release: IUnknown.VTable.Release,
-        SetSite: *const fn (self: *@This(), pUnkSite: *const IUnknown) callconv(.winapi) HRESULT,
-        GetSite: *const fn (self: *@This(), riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
+        QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
+        AddRef: @FieldType(IUnknown.VTable, "AddRef"),
+        Release: @FieldType(IUnknown.VTable, "Release"),
+        SetSite: *const fn (self: *IObjectWithSite, pUnkSite: *const IUnknown) callconv(.winapi) HRESULT,
+        GetSite: *const fn (self: *IObjectWithSite, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
     };
 };
 
