@@ -36,14 +36,14 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic("Unable to open 'explorer.exe' process.");
+        @panic("Failed to open 'explorer.exe' process.");
     };
 
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
             @branchHint(.cold);
 
-            @panic("Unable to get path to the 'transparenZ' executable.");
+            @panic("Failed to get path to the 'transparenZ' executable.");
         };
 
         utils.exeDirPathToUiDllPath(&exeDirPath);
@@ -57,7 +57,7 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic("Unable to allocate '" ++ constants.UI_DLL_FILE_NAME ++ "' string in explorer.exe.");
+        @panic("Failed to allocate '" ++ constants.UI_DLL_FILE_NAME ++ "' string in explorer.exe.");
     };
 
     const loadLibraryWAddress = win.GetProcAddress(
@@ -95,6 +95,7 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
     };
 
     var pid: zigWin.DWORD = 0;
+
     if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
         @branchHint(.cold);
 
