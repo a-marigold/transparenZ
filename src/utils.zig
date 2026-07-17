@@ -1,5 +1,3 @@
-//! Shared utils used both in the `ui.dll` and the main.
-
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
@@ -61,4 +59,10 @@ pub inline fn exeDirPathToUiDllPath(exeDirPath: *AbsPath) void {
 
     exeDirPath.len += uiDllPath.len + 1; // Add 1 for Null Terminator
     exeDirPath.buffer[exeDirPath.len - 1] = 0; // Add Null Terminator
+}
+
+/// Returns full name of event of `code` to be used in `CreateEvent` or `OpenEvent`.
+/// Combines `constants.UI_DLL_CODE_EVENT_PREFIX` and provided `code`.
+pub fn getUiDllCodeEventName(code: constants.UiDllCode) *[:0]const u8 {
+    return constants.UI_DLL_CODE_EVENT_PREFIX ++ code;
 }
