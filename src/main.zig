@@ -7,6 +7,9 @@ const constants = @import("constants.zig");
 
 const utils = @import("utils.zig");
 
+const UiDllCode = constants.UiDllCode;
+const UiDllCodeValues = @typeInfo(UiDllCode).@"enum".field_values;
+
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
     _ = ret_addr;
@@ -26,7 +29,7 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
             );
         }
     }
-	win.TerminateProcess(win.GetCurrentProcessId(), 1);
+    win.TerminateProcess(win.GetCurrentProcessId(), 1);
 }
 
 pub fn main() void {
@@ -47,6 +50,7 @@ pub fn main() void {
         };
 
         utils.exeDirPathToUiDllPath(&exeDirPath);
+
         break :block exeDirPath;
     };
 
@@ -60,28 +64,52 @@ pub fn main() void {
         @panic("Failed to allocate '" ++ constants.UI_DLL_FILE_NAME ++ "' string in explorer.exe.");
     };
 
-    const loadLibraryWAddress = win.GetProcAddress(
+    const loadLibraryW = win.GetProcAddress(
         win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
         "LoadLibraryW",
     );
-    _ = win.CreateRemoteThread(
+
+    // Create events before injection
+    const uiDllCodeEvents = createUiDllCodeEvents();
+
+    const injectedThread = win.CreateRemoteThread(
         explorerProcess,
         null,
         0,
-        @ptrCast(loadLibraryWAddress),
+        @ptrCast(loadLibraryW),
         uiDllPathStartAddress,
         0,
         null,
     );
 }
 
+/// Creates events for every variant of `UiDllCode`.
+///
+/// Returns array of event handles, where handles are located in strict order of `UiDllCode` enum fields.
+///
+/// Example:
+///
+/// Accessing `UiDllCode.Success` (the first field of `UiDllCode`) - `uiDllCodeEvents[0]`.
+inline fn createUiDllCodeEvents() [UiDllCodeValues.len]zigWin.HANDLE {
+    const uiDllCodeEvents: [UiDllCodeValues.len]zigWin.HANDLE = undefined;
+
+    inline for (UiDllCodeValues, 0..) |code, index| {
+        uiDllCodeEvents[index] = win.CreateEventExW(
+            null,
+            unicode.utf8ToUtf16LeStringLiteral(utils.getUiDllCodeEventName(code)),
+            0,
+            win.SYNCHRONIZE | win.EVENT_MODIFY_STATE,
+        );
+    }
+
+    return uiDllCodeEvents;
+}
+
 /// Opens process which owns the window of `windowClassName`.
 ///
 /// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
 ///
-/// Caller owns the handle to process.
-///
-/// Returns `zigWin.HANDLE` to the process, or `null` in case of error.
+/// Returns `zigWin.HANDLE` to the process or `null` in case of error.
 inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DWORD) ?zigWin.HANDLE {
     const hwnd = win.FindWindowExW(
         null,
@@ -93,7 +121,6 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 
         return null;
     };
-
     var pid: zigWin.DWORD = 0;
 
     if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
@@ -101,7 +128,6 @@ inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DW
 
         return null;
     }
-
     return win.OpenProcess(
         dwDesiredAccess,
         win.FALSE,
