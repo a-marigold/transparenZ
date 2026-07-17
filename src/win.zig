@@ -75,8 +75,18 @@ pub const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
     cbData: u32,
 };
 
+pub const WAIT_OBJECT_0: zigWin.DWORD = 0;
+
+pub const WAIT_TIMEOUT: zigWin.DWORD = 0x00000102;
+
+pub const WAIT_FAILED: zigWin.DWORD = 0xFFFFFFFF;
+
 pub const LOAD_LIBRARY_SEARCH_SYSTEM32: zigWin.DWORD = 0x00000800;
+
 pub const LOAD_LIBRARY_AS_DATAFILE: zigWin.DWORD = 0x00000002;
+
+pub const SYNCHRONIZE: zigWin.DWORD = 0x00100000;
+pub const EVENT_MODIFY_STATE: zigWin.DWORD = 0x0002;
 
 pub const IUnknown = extern struct {
     vtable: *const VTable,
@@ -106,12 +116,9 @@ pub const IObjectWithSite = extern struct {
         // for imitation of cpp inheritance.
         // If replace opaques with `IObjectWithSite`,
         // there are type errors in inherited objects
-
         QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
-
         AddRef: @FieldType(IUnknown.VTable, "AddRef"),
         Release: @FieldType(IUnknown.VTable, "Release"),
-
         SetSite: *const fn (self: *anyopaque, pUnkSite: *IUnknown) callconv(.winapi) HRESULT,
         GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
     };
@@ -167,6 +174,23 @@ pub extern "user32" fn FindWindowExW(
     lpClassName: zigWin.LPCWSTR,
     lpWindowName: ?zigWin.LPCWSTR,
 ) callconv(.winapi) ?zigWin.HWND;
+
+pub extern "kernel32" fn CreateEventExW(
+    lpEventAttributes: *zigWin.SECURITY_ATTRIBUTES,
+    lpName: zigWin.LPCWSTR,
+    dwFlags: zigWin.DWORD,
+    dwDesiredAccess: zigWin.DWORD,
+) callconv(.winapi) zigWin.HANDLE;
+
+pub extern "kernel32" fn OpenEventW(
+    dwDesiredAccess: zigWin.DWORD,
+    bInheritHandle: zigWin.BOOL,
+    lpName: zigWin.LPCWSTR,
+) callconv(.winapi) zigWin.HANDLE;
+
+pub extern "kernel32" fn SetEvent(
+    hEvent: zigWin.HANDLE,
+) callconv(.winapi) BOOL;
 
 pub extern "user32" fn GetWindowThreadProcessId(
     hwnd: zigWin.HWND,
@@ -236,12 +260,9 @@ pub extern "kernel32" fn TerminateProcess(
     uExitCode: zigWin.UINT,
 ) callconv(.winapi) BOOL;
 
-pub extern "kernel32" fn WaitForSingleObject(
-    hHandle: zigWin.HANDLE,
+pub extern "kernel32" fn WaitForMultipleObjects(
+    nCount: zigWin.DWORD,
+    lpHandles: [*]const zigWin.HANDLE,
+    bWaitAll: BOOL,
     dwMilliseconds: zigWin.DWORD,
 ) callconv(.winapi) zigWin.DWORD;
-
-pub extern "kernel32" fn GetExitCodeThread(
-    hThread: zigWin.HANDLE,
-    lpExitCode: LPDWORD,
-) callconv(.winapi) BOOL;

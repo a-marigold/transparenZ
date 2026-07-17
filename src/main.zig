@@ -29,7 +29,7 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
             );
         }
     }
-    win.TerminateProcess(win.GetCurrentProcessId(), 1);
+    utils.exit(1);
 }
 
 pub fn main() void {
@@ -72,7 +72,7 @@ pub fn main() void {
     // Create events before injection
     const uiDllCodeEvents = createUiDllCodeEvents();
 
-    const injectedThread = win.CreateRemoteThread(
+    _ = win.CreateRemoteThread(
         explorerProcess,
         null,
         0,
@@ -81,6 +81,32 @@ pub fn main() void {
         0,
         null,
     );
+
+    const waitCount = uiDllCodeEvents.len;
+
+    const waitResult = win.WaitForMultipleObjects(
+        waitCount,
+        &uiDllCodeEvents,
+        win.FALSE,
+        32_000,
+    );
+
+    if (waitResult == win.WAIT_TIMEOUT) {
+        @panic("Waiting time of '" ++ constants.UI_DLL_FILE_NAME ++ "' completion expired.");
+    } else if (waitResult == win.WAIT_FAILED) {
+        @panic("Waiting for '" ++ constants.UI_DLL_FILE_NAME ++ "' completion failed.");
+    }
+
+    const eventIndex = waitResult - win.WAIT_OBJECT_0;
+
+    switch (UiDllCodeValues[eventIndex]) {
+        UiDllCode.Success => {
+            utils.exit(0);
+        },
+        UiDllCode.GetExeDirFailed => {
+            @panic("Failed to get path to the '" ++ constants.UI_DLL_FILE_NAME ++ "' executable.");
+        },
+    }
 }
 
 /// Creates events for every variant of `UiDllCode`.
