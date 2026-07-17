@@ -71,3 +71,65 @@ pub fn getUiDllCodeEventName(code: constants.UiDllCode) *[:0]const u8 {
 pub inline fn exit(exitCode: zigWin.UINT) noreturn {
     win.TerminateProcess(win.GetCurrentProcessId(), exitCode);
 }
+
+/// Opens process which owns the window of `windowClassName`.
+///
+/// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
+///
+/// Returns `zigWin.HANDLE` to the process or `null` in case of error.
+inline fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DWORD) ?zigWin.HANDLE {
+    const hwnd = win.FindWindowExW(
+        null,
+        null,
+        windowClassName,
+        null,
+    ) orelse {
+        @branchHint(.cold);
+
+        return null;
+    };
+    var pid: zigWin.DWORD = 0;
+
+    if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
+        @branchHint(.cold);
+
+        return null;
+    }
+    return win.OpenProcess(
+        dwDesiredAccess,
+        win.FALSE,
+        pid,
+    );
+}
+
+/// Allocates memory in process of `processHandler` and then writes `data` there.
+///
+/// Returns start address of allocated memory or `null` in case of error.
+inline fn allocWriteProcessMemory(
+    data: *const anyopaque,
+    /// Size in bytes
+    size: zigWin.SIZE_T,
+    processHandle: zigWin.HANDLE,
+) ?zigWin.LPVOID {
+    const startAddress = win.VirtualAllocEx(
+        processHandle,
+        null,
+        size,
+        win.MEM_RESERVE | win.MEM_COMMIT,
+        win.PAGE_READWRITE,
+    ) orelse {
+        return null;
+    };
+
+    if (win.WriteProcessMemory(
+        processHandle,
+        startAddress,
+        data,
+        size,
+        null,
+    ) == win.FALSE) {
+        return null;
+    }
+
+    return startAddress;
+}

@@ -87,6 +87,7 @@ pub fn main() void {
     const waitResult = win.WaitForMultipleObjects(
         waitCount,
         &uiDllCodeEvents,
+
         win.FALSE,
         32_000,
     );
@@ -103,6 +104,7 @@ pub fn main() void {
         UiDllCode.Success => {
             utils.exit(0);
         },
+
         UiDllCode.GetExeDirFailed => {
             @panic("Failed to get path to the '" ++ constants.UI_DLL_FILE_NAME ++ "' executable.");
         },
@@ -111,7 +113,7 @@ pub fn main() void {
 
 /// Creates events for every variant of `UiDllCode`.
 ///
-/// Returns array of event handles, where handles are located in strict order of `UiDllCode` enum fields.
+/// Returns created array of event handles, where handles are located in strict order of `UiDllCodeEvent` enum fields.
 ///
 /// Example:
 ///
@@ -129,66 +131,4 @@ inline fn createUiDllCodeEvents() [UiDllCodeValues.len]zigWin.HANDLE {
     }
 
     return uiDllCodeEvents;
-}
-
-/// Opens process which owns the window of `windowClassName`.
-///
-/// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
-///
-/// Returns `zigWin.HANDLE` to the process or `null` in case of error.
-inline fn getProcess(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DWORD) ?zigWin.HANDLE {
-    const hwnd = win.FindWindowExW(
-        null,
-        null,
-        windowClassName,
-        null,
-    ) orelse {
-        @branchHint(.cold);
-
-        return null;
-    };
-    var pid: zigWin.DWORD = 0;
-
-    if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
-        @branchHint(.cold);
-
-        return null;
-    }
-    return win.OpenProcess(
-        dwDesiredAccess,
-        win.FALSE,
-        pid,
-    );
-}
-
-/// Allocates memory in process of `processHandler` and then writes `data` there.
-///
-/// Returns start address of allocated memory or `null` in case of error.
-inline fn allocWriteProcessMemory(
-    data: *const anyopaque,
-    /// Size in bytes
-    size: zigWin.SIZE_T,
-    processHandle: zigWin.HANDLE,
-) ?zigWin.LPVOID {
-    const startAddress = win.VirtualAllocEx(
-        processHandle,
-        null,
-        size,
-        win.MEM_RESERVE | win.MEM_COMMIT,
-        win.PAGE_READWRITE,
-    ) orelse {
-        return null;
-    };
-
-    if (win.WriteProcessMemory(
-        processHandle,
-        startAddress,
-        data,
-        size,
-        null,
-    ) == win.FALSE) {
-        return null;
-    }
-
-    return startAddress;
 }
