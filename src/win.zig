@@ -76,6 +76,7 @@ pub const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
 };
 
 pub const LOAD_LIBRARY_SEARCH_SYSTEM32: zigWin.DWORD = 0x00000800;
+pub const LOAD_LIBRARY_AS_DATAFILE: zigWin.DWORD = 0x00000002;
 
 pub const IUnknown = extern struct {
     vtable: *const VTable,
@@ -107,8 +108,10 @@ pub const IObjectWithSite = extern struct {
         // there are type errors in inherited objects
 
         QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
+
         AddRef: @FieldType(IUnknown.VTable, "AddRef"),
         Release: @FieldType(IUnknown.VTable, "Release"),
+
         SetSite: *const fn (self: *anyopaque, pUnkSite: *IUnknown) callconv(.winapi) HRESULT,
         GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
     };
@@ -227,3 +230,18 @@ pub extern "kernel32" fn GetModuleFileNameW(
     lpFilename: zigWin.LPWSTR,
     nSize: zigWin.DWORD,
 ) callconv(.winapi) zigWin.DWORD;
+
+pub extern "kernel32" fn TerminateProcess(
+    hProcess: zigWin.HANDLE,
+    uExitCode: zigWin.UINT,
+) callconv(.winapi) BOOL;
+
+pub extern "kernel32" fn WaitForSingleObject(
+    hHandle: zigWin.HANDLE,
+    dwMilliseconds: zigWin.DWORD,
+) callconv(.winapi) zigWin.DWORD;
+
+pub extern "kernel32" fn GetExitCodeThread(
+    hThread: zigWin.HANDLE,
+    lpExitCode: LPDWORD,
+) callconv(.winapi) BOOL;

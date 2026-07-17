@@ -26,7 +26,7 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
             );
         }
     }
-    @trap();
+	win.TerminateProcess(win.GetCurrentProcessId(), 1);
 }
 
 pub fn main() void {
