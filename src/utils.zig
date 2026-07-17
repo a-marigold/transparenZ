@@ -66,3 +66,8 @@ pub inline fn exeDirPathToUiDllPath(exeDirPath: *AbsPath) void {
 pub fn getUiDllCodeEventName(code: constants.UiDllCode) *[:0]const u8 {
     return constants.UI_DLL_CODE_EVENT_PREFIX ++ code;
 }
+
+/// Exits the process.
+pub inline fn exit(exitCode: zigWin.UINT) noreturn {
+    win.TerminateProcess(win.GetCurrentProcessId(), exitCode);
+}
