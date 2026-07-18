@@ -8,12 +8,10 @@ const constants = @import("constants.zig");
 const utils = @import("utils.zig");
 
 const UiDllCode = constants.UiDllCode;
-const UiDllCodeValues = @typeInfo(UiDllCode).@"enum".field_values;
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
     _ = ret_addr;
-
     // Safe stderr writing without allocations
     if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
         @branchHint(.likely);
@@ -69,8 +67,14 @@ pub fn main() void {
         "LoadLibraryW",
     );
 
+    const uiDllCodeValues = @typeInfo(uiDllCodeEvents).@"enum".field_values;
+
     // Create events before injection
-    const uiDllCodeEvents = createUiDllCodeEvents();
+    const uiDllCodeEvents = createEventsFromEnum(
+        uiDllCodeValues,
+        constants.UI_DLL_FILE_NAME,
+        win.SYNCHRONIZE | win.EVENT_MODIFY_STATE,
+    );
 
     _ = win.CreateRemoteThread(
         explorerProcess,
@@ -100,7 +104,7 @@ pub fn main() void {
 
     const eventIndex = waitResult - win.WAIT_OBJECT_0;
 
-    switch (UiDllCodeValues[eventIndex]) {
+    switch (enumFieldValues[eventIndex]) {
         UiDllCode.Success => {
             utils.exit(0);
         },
@@ -111,24 +115,45 @@ pub fn main() void {
     }
 }
 
-/// Creates events for every variant of `UiDllCode`.
+/// Creates events via `CreateEventExW` for every element of `enumValues`.
 ///
-/// Returns created array of event handles, where handles are located in strict order of `UiDllCodeEvent` enum fields.
+/// Returns created array of event handles, where handles
+/// are located in strict order of `UiDllCodeEvent` enum fields.
 ///
 /// Example:
+/// ```zig
+/// const Letter = enum(u32) {
+///   A,
+///   B,
+///   C,
+/// };
+/// const letterValues = @typeInfo(Letter).@"enum".field_values;
 ///
+/// const events = createEventsFromEnum(letterValues, "Local\\\\Letter", win.EVENT_ALL_ACCESS);
+///
+/// // Created 'Local\\LetterA', 'Local\\LetterB', 'Local\\LetterC'
+///
+/// // `events[0]` is `Letter.A`, `events[1]` is `Letter.B` and so on
+/// ```
 /// Accessing `UiDllCode.Success` (the first field of `UiDllCode`) - `uiDllCodeEvents[0]`.
-inline fn createUiDllCodeEvents() [UiDllCodeValues.len]zigWin.HANDLE {
-    const uiDllCodeEvents: [UiDllCodeValues.len]zigWin.HANDLE = undefined;
+inline fn createEventsFromEnum(
+    /// `field_values` of an `Enum`.
+    comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
+    /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    comptime namePrefix: [:0]const u8,
+    /// `dwDesiredAccess` parameter of `CreateEventExW`.
+    dwDesiredAccess: zigWin.DWORD,
+) [enumValues.len]zigWin.HANDLE {
+    const events: [enumValues.len]zigWin.HANDLE = undefined;
 
-    inline for (UiDllCodeValues, 0..) |code, index| {
-        uiDllCodeEvents[index] = win.CreateEventExW(
+    inline for (enumValues, 0..) |value, index| {
+        events[index] = win.CreateEventExW(
             null,
-            unicode.utf8ToUtf16LeStringLiteral(utils.getUiDllCodeEventName(code)),
+            unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
             0,
-            win.SYNCHRONIZE | win.EVENT_MODIFY_STATE,
+            dwDesiredAccess,
         );
     }
 
-    return uiDllCodeEvents;
+    return events;
 }
