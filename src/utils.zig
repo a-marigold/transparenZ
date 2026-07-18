@@ -135,7 +135,9 @@ pub fn allocWriteProcessMemory(
 /// Creates events via `CreateEventExW` for every element of `enumValues`.
 ///
 /// Returns created array of event handles, where handles
-/// are located in strict order of `UiDllCodeEvent` enum fields.
+/// are located in strict order of `enumValues`.
+///
+/// If any call of `CreateEventExW` fails, returns `null`.
 ///
 /// Example:
 /// ```zig
@@ -170,6 +172,46 @@ pub inline fn createEventsFromEnum(
             0,
             dwDesiredAccess,
         );
+
+        if (event == null) {
+            @branchHint(.cold);
+            return null;
+        }
+
+        events[index] = event;
+    }
+
+    return events;
+}
+
+/// The same as `createEventsFromEnum`, but opens events (`OpenEventW`) instead of creating them.
+///
+/// Returns array of opened events, where handles
+/// are located in strict order of `enumValues`.
+///
+/// If any call of `OpenEventW` fails, returns `null`.
+pub inline fn openEventsFromEnum(
+    comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
+    comptime namePrefix: []const u8,
+    /// `bInheritHandle` parameter of `OpenEventW`.
+    bInheritHandle: win.BOOL,
+    dwDesiredAccess: zigWin.DWORD,
+) ?[enumValues.len]zigWin.HANDLE {
+    var events: [enumValues.len]zigWin.HANDLE = undefined;
+
+    inline for (enumValues, 0..) |value, index| {
+        const event = win.OpenEventW(
+            dwDesiredAccess,
+            bInheritHandle,
+            unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
+        );
+
+        if (event == null) {
+            @branchHint(.cold);
+
+            return null;
+        }
+        events[index] = event;
     }
 
     return events;
