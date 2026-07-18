@@ -15,6 +15,8 @@ const utils = @import("utils.zig");
 
 const TaskbarHook = @import("taskbar_hook.zig");
 
+const UiDllCode = constants.UiDllCode;
+
 var taskbarHook = TaskbarHook.taskbarHook;
 
 export fn DllMain(
@@ -24,30 +26,29 @@ export fn DllMain(
 ) callconv(.winapi) win.BOOL {
     _ = lpvReserved;
 
-    switch (fwdReason) {
-        win.DLL_PROCESS_ATTACH => {
-            _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
+    if (fwdReason == win.DLL_PROCESS_ATTACH) {
+        _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
 
-            const thread = win.CreateThread(
-                null,
-                0,
-                &initXamlDiagnostics,
-                null,
-                0,
-                null,
-            );
-            if (thread) |handle| {
-                _ = win.CloseHandle(handle);
+        // New thread is used 'cause `initXamlDiagnostics`
+        // loads libraries and can cause loader lock
+        const thread = win.CreateThread(
+            null,
+            0,
+            &initXamlDiagnostics,
+            null,
+            0,
+            null,
+        );
+        if (thread) |handle| {
+            _ = win.CloseHandle(handle);
 
-                return win.TRUE;
-            }
-
-            return win.FALSE;
-        },
-        else => {
             return win.TRUE;
-        },
+        }
+
+        return win.FALSE;
     }
+
+    return win.TRUE;
 }
 
 /// Called when `InitializeXamlDiagnosticsEx` loads this DLL.
@@ -57,7 +58,7 @@ export fn DllGetClassObject(
     ppv: *zigWin.LPVOID,
 ) callconv(.winapi) win.HRESULT {
     // The check is not actually needed
-    // 'cause `DllGetClassObject` is called only by `InitializeXamlDiagnoticsEx`
+    // 'cause `DllGetClassObject` is called only by `InitializeXamlDiagnoticsEx`.
     // But it ensures there won't be any problem
     if (std.meta.eql(rclsid.*, TaskbarHook.TASKBAR_HOOK_GUID)) {
         return taskbarHook.vtable.QueryInterface(taskbarHook, riid, ppv);
@@ -66,26 +67,52 @@ export fn DllGetClassObject(
     return .CLASS_E_CLASSNOTAVAILABLE;
 }
 
-fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWORD {
+/// Loads `Windows.Ui.Xaml.dll` and calls `InitializeXamlDiagnosticsEx`.
+///
+/// `InitializeXamlDiagnosticsEx` loads this dll again, calls `DllGetClassObject`,
+/// and if it succeed `taskbarHook.xamlDiagnosticsInterface` has `IXamlDiagnostics`,
+/// which is used to style taskbar.
+fn initXamlDiagnostics(
+    /// Used in `CreateThread` so this parameter is needed.
+    lpParameter: ?zigWin.LPVOID,
+) callconv(.winapi) zigWin.DWORD {
     _ = lpParameter;
 
-    const windowsUiXaml = win.LoadLibraryExW(
+    const uiDllCodeValues = @typeInfo(UiDllCode).@"enum".field_values;
+    const uiDllCodeEvents = utils.openEventsOfEnum(
+        uiDllCodeValues,
+
+        UiDllCode.EVENT_NAME_PREFIX,
+        win.FALSE,
+        UiDllCode.EVENT_DESIRED_ACCESS,
+    );
+
+    const winUiXamlDll = win.LoadLibraryExW(
         unicode.utf8ToUtf16LeStringLiteral(win.WINDOWS_UI_XAML_DLL_NAME),
         null,
         win.LOAD_LIBRARY_SEARCH_SYSTEM32,
     );
 
     const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
-        windowsUiXaml,
+        winUiXamlDll,
+
         "InitializeXamlDiagnostics",
     ));
 
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
+            _ = utils.setEventOfEnum(
+                UiDllCode,
+                UiDllCode.GetExeDirFailed,
+                uiDllCodeValues,
+                uiDllCodeEvents,
+            );
+
             return 0;
         };
 
         utils.exeDirPathToUiDllPath(&exeDirPath);
+
         break :block exeDirPath;
     };
 
@@ -100,17 +127,13 @@ fn initXamlDiagnostics(lpParameter: ?zigWin.LPVOID) callconv(.winapi) zigWin.DWO
         null,
     );
 
+    // Neccessarily indicate success
+    _ = utils.setEventOfEnum(
+        UiDllCode,
+        UiDllCode.Success,
+        uiDllCodeValues,
+        uiDllCodeEvents,
+    );
+
     return 1;
 }
-
-// Only To test DLL loading
-
-extern "kernel32" fn CreateFileW(
-    lpFileName: zigWin.LPCWSTR,
-    dwDesiredAccess: zigWin.DWORD,
-    dwShareMode: zigWin.DWORD,
-    lpSecurityAttributes: ?*zigWin.SECURITY_ATTRIBUTES,
-    dwCreationDisposition: zigWin.DWORD,
-    dwFlagsAndAttributes: zigWin.DWORD,
-    hTemplateFile: ?zigWin.HANDLE,
-) callconv(.winapi) ?zigWin.HANDLE;

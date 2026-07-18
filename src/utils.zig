@@ -159,17 +159,19 @@ pub inline fn createEventsFromEnum(
     /// `field_values` of an `Enum`.
     comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
-    comptime namePrefix: [:0]const u8,
+    comptime namePrefix: []const u8,
+    /// `dwFlags` parameter of `CreateEventExW`.
+    dwFlags: zigWin.DWORD,
     /// `dwDesiredAccess` parameter of `CreateEventExW`.
     dwDesiredAccess: zigWin.DWORD,
-) [enumValues.len]zigWin.HANDLE {
-    const events: [enumValues.len]zigWin.HANDLE = undefined;
+) ?[enumValues.len]zigWin.HANDLE {
+    var events: [enumValues.len]zigWin.HANDLE = undefined;
 
     inline for (enumValues, 0..) |value, index| {
-        events[index] = win.CreateEventExW(
+        const event = win.CreateEventExW(
             null,
             unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
-            0,
+            dwFlags,
             dwDesiredAccess,
         );
 
@@ -190,7 +192,7 @@ pub inline fn createEventsFromEnum(
 /// are located in strict order of `enumValues`.
 ///
 /// If any call of `OpenEventW` fails, returns `null`.
-pub inline fn openEventsFromEnum(
+pub inline fn openEventsOfEnum(
     comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     comptime namePrefix: []const u8,
     /// `bInheritHandle` parameter of `OpenEventW`.
@@ -215,4 +217,19 @@ pub inline fn openEventsFromEnum(
     }
 
     return events;
+}
+
+pub inline fn setEventOfEnum(
+    comptime T: type,
+    comptime value: T,
+    comptime enumValues: @typeInfo(T).@"enum".field_values,
+    events: [enumValues.len]zigWin.HANDLE,
+) win.BOOL {
+    var valueIndex = comptime 0;
+
+    inline while (enumValues[valueIndex] != value) {
+        valueIndex += 1;
+    }
+
+    return win.SetEvent(events[valueIndex]);
 }
