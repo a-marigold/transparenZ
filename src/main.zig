@@ -75,9 +75,9 @@ pub fn main() void {
     // Create events before injection
     const uiDllCodeEvents = utils.createEventsFromEnum(
         uiDllCodeValues,
-        constants.UI_DLL_FILE_NAME,
+        UiDllCode.EVENT_PREFIX,
         0,
-        win.SYNCHRONIZE | win.EVENT_MODIFY_STATE,
+        UiDllCode.EVENT_DESIRED_ACCESS,
     );
 
     _ = win.CreateRemoteThread(
