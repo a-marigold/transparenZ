@@ -145,8 +145,6 @@ pub extern "kernel32" fn LoadLibraryExW(
     dwFlags: zigWin.DWORD,
 ) callconv(.winapi) zigWin.HMODULE;
 
-pub extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) zigWin.DWORD;
-
 pub extern "user32" fn SetWindowCompositionAttribute(
     hwnd: zigWin.HWND,
     pAttrData: *const WINDOWCOMPOSITIONATTRIBDATA,
@@ -159,6 +157,10 @@ pub extern "kernel32" fn WriteFile(
     lpNumberOfBytesWritten: LPDWORD,
     lpOverlapped: ?*anyopaque,
 ) callconv(.winapi) BOOL;
+
+pub extern "kernel32" fn GetCurrentProcess() callconv(.winapi) zigWin.HANDLE;
+
+pub extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) zigWin.HANDLE;
 
 pub extern "kernel32" fn OpenProcess(
     dwDesiredAccess: zigWin.DWORD,
@@ -184,7 +186,7 @@ pub extern "kernel32" fn CreateEventExW(
 
 pub extern "kernel32" fn OpenEventW(
     dwDesiredAccess: zigWin.DWORD,
-    bInheritHandle: zigWin.BOOL,
+    bInheritHandle: BOOL,
     lpName: zigWin.LPCWSTR,
 ) callconv(.winapi) ?zigWin.HANDLE;
 

@@ -128,7 +128,7 @@ pub fn allocWriteProcessMemory(
 
 /// Exits the current process.
 pub inline fn exit(exitCode: zigWin.UINT) noreturn {
-    win.TerminateProcess(win.GetCurrentProcessId(), exitCode);
+    win.TerminateProcess(win.GetCurrentProcess(), exitCode);
 }
 
 /// Creates events via `CreateEventExW` for every element of `enumValues`.
@@ -156,7 +156,7 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 /// // `events[0]` is `Letter.A`, `events[1]` is `Letter.B` and so on
 /// ```
 /// Accessing `UiDllCode.Success` (the first field of `UiDllCode`) - `uiDllCodeEvents[0]`.
-pub inline fn createEventsFromEnum(
+pub fn createEventsFromEnum(
     /// `field_values` of an `Enum`.
     comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
