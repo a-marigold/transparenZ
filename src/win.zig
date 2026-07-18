@@ -180,13 +180,13 @@ pub extern "kernel32" fn CreateEventExW(
     lpName: zigWin.LPCWSTR,
     dwFlags: zigWin.DWORD,
     dwDesiredAccess: zigWin.DWORD,
-) callconv(.winapi) zigWin.HANDLE;
+) callconv(.winapi) ?zigWin.HANDLE;
 
 pub extern "kernel32" fn OpenEventW(
     dwDesiredAccess: zigWin.DWORD,
     bInheritHandle: zigWin.BOOL,
     lpName: zigWin.LPCWSTR,
-) callconv(.winapi) zigWin.HANDLE;
+) callconv(.winapi) ?zigWin.HANDLE;
 
 pub extern "kernel32" fn SetEvent(
     hEvent: zigWin.HANDLE,

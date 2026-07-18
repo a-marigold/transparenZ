@@ -76,6 +76,7 @@ pub fn main() void {
     const uiDllCodeEvents = utils.createEventsFromEnum(
         uiDllCodeValues,
         constants.UI_DLL_FILE_NAME,
+        0,
         win.SYNCHRONIZE | win.EVENT_MODIFY_STATE,
     );
 
