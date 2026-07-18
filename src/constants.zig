@@ -8,8 +8,6 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 
 pub const UI_DLL_INIT_FUNC_NAME = "init";
 
-pub const UTF16_BACK_SLASH: zigWin.WCHAR = unicode.utf8ToUtf16LeStringLiteral("\\")[0];
-
 // const ACCENT_POLICY: win.ACCENT_POLICY = .{
 //     .AccentState = .ACCENT_ENABLE_ACRYLICBLURBEHIND,
 //     .AccentFlags = 0,
@@ -44,3 +42,17 @@ pub const UiDllCode = enum(u32) {
 
 /// See `UiDllErrorEvent`.
 pub const UI_DLL_CODE_EVENT_PREFIX = "Local\\\\tZyE";
+
+pub const errors = struct {
+    // main process errors
+    pub const OPEN_EXPLORER_FAIL = "Failed to open 'explorer.exe' process.";
+    pub const GET_EXE_PATH_FAIL = "Failed to get path to the 'transparenZ' executable.";
+
+    pub const ALLOC_UI_DLL_FILE_NAME_FAIL = "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' string in explorer.exe.";
+
+    pub const WAIT_UI_DLL_TIMEOUT = "Waiting time of '" ++ UI_DLL_FILE_NAME ++ "' completion expired.";
+    pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
+
+    // `ui.dll` errors
+    pub const UI_DLL_GET_EXE_PATH_FAIL = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+};

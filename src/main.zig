@@ -7,6 +7,8 @@ const constants = @import("constants.zig");
 
 const utils = @import("utils.zig");
 
+const errors = constants.errors;
+
 const UiDllCode = constants.UiDllCode;
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
@@ -31,20 +33,21 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
 }
 
 pub fn main() void {
-    const explorerProcess = getProcess(
+    const explorerProcess = utils.findProcessByWindowClass(
         unicode.utf8ToUtf16LeStringLiteral(win.TASK_BAR_CLASS_NAME),
+
         win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE | win.PROCESS_CREATE_THREAD,
     ) orelse {
         @branchHint(.cold);
 
-        @panic("Failed to open 'explorer.exe' process.");
+        @panic(errors.OPEN_EXPLORER_FAIL);
     };
 
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
             @branchHint(.cold);
 
-            @panic("Failed to get path to the 'transparenZ' executable.");
+            @panic(errors.GET_EXE_PATH_FAIL);
         };
 
         utils.exeDirPathToUiDllPath(&exeDirPath);
@@ -52,14 +55,14 @@ pub fn main() void {
         break :block exeDirPath;
     };
 
-    const uiDllPathStartAddress = allocWriteProcessMemory(
+    const uiDllPathStartAddress = utils.allocWriteProcessMemory(
         &uiDllPath.buffer,
         uiDllPath.len * @sizeOf(zigWin.WCHAR),
         explorerProcess,
     ) orelse {
         @branchHint(.cold);
 
-        @panic("Failed to allocate '" ++ constants.UI_DLL_FILE_NAME ++ "' string in explorer.exe.");
+        @panic(errors.ALLOC_UI_DLL_FILE_NAME_FAIL);
     };
 
     const loadLibraryW = win.GetProcAddress(
@@ -67,10 +70,10 @@ pub fn main() void {
         "LoadLibraryW",
     );
 
-    const uiDllCodeValues = @typeInfo(uiDllCodeEvents).@"enum".field_values;
+    const uiDllCodeValues = @typeInfo(UiDllCode).@"enum".field_values;
 
     // Create events before injection
-    const uiDllCodeEvents = createEventsFromEnum(
+    const uiDllCodeEvents = utils.createEventsFromEnum(
         uiDllCodeValues,
         constants.UI_DLL_FILE_NAME,
         win.SYNCHRONIZE | win.EVENT_MODIFY_STATE,
@@ -97,63 +100,20 @@ pub fn main() void {
     );
 
     if (waitResult == win.WAIT_TIMEOUT) {
-        @panic("Waiting time of '" ++ constants.UI_DLL_FILE_NAME ++ "' completion expired.");
+        @panic(errors.WAIT_UI_DLL_TIMEOUT);
     } else if (waitResult == win.WAIT_FAILED) {
-        @panic("Waiting for '" ++ constants.UI_DLL_FILE_NAME ++ "' completion failed.");
+        @panic(errors.WAIT_UI_DLL_FAIL);
     }
 
     const eventIndex = waitResult - win.WAIT_OBJECT_0;
 
-    switch (enumFieldValues[eventIndex]) {
+    switch (uiDllCodeValues[eventIndex]) {
         UiDllCode.Success => {
             utils.exit(0);
         },
 
         UiDllCode.GetExeDirFailed => {
-            @panic("Failed to get path to the '" ++ constants.UI_DLL_FILE_NAME ++ "' executable.");
+            @panic(errors.UI_DLL_GET_EXE_PATH_FAIL);
         },
     }
-}
-
-/// Creates events via `CreateEventExW` for every element of `enumValues`.
-///
-/// Returns created array of event handles, where handles
-/// are located in strict order of `UiDllCodeEvent` enum fields.
-///
-/// Example:
-/// ```zig
-/// const Letter = enum(u32) {
-///   A,
-///   B,
-///   C,
-/// };
-/// const letterValues = @typeInfo(Letter).@"enum".field_values;
-///
-/// const events = createEventsFromEnum(letterValues, "Local\\\\Letter", win.EVENT_ALL_ACCESS);
-///
-/// // Created 'Local\\LetterA', 'Local\\LetterB', 'Local\\LetterC'
-///
-/// // `events[0]` is `Letter.A`, `events[1]` is `Letter.B` and so on
-/// ```
-/// Accessing `UiDllCode.Success` (the first field of `UiDllCode`) - `uiDllCodeEvents[0]`.
-inline fn createEventsFromEnum(
-    /// `field_values` of an `Enum`.
-    comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
-    /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
-    comptime namePrefix: [:0]const u8,
-    /// `dwDesiredAccess` parameter of `CreateEventExW`.
-    dwDesiredAccess: zigWin.DWORD,
-) [enumValues.len]zigWin.HANDLE {
-    const events: [enumValues.len]zigWin.HANDLE = undefined;
-
-    inline for (enumValues, 0..) |value, index| {
-        events[index] = win.CreateEventExW(
-            null,
-            unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
-            0,
-            dwDesiredAccess,
-        );
-    }
-
-    return events;
 }

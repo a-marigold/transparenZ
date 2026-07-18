@@ -11,6 +11,7 @@ pub const AbsPath = struct {
     ///
     /// Use `AbsPath.len` instead.
     ///
+    ///
     /// Everything that is after `AbsPath.buffer[AbsPath.len - 1]` is a stack garbage.
     buffer: [zigWin.MAX_PATH:0]zigWin.WCHAR,
 
@@ -34,10 +35,12 @@ pub fn getExeDirPath() ?AbsPath {
         return null;
     }
 
+    const utf16BackSlash = unicode.utf8ToUtf16LeStringLiteral("\\")[0];
+
     var pathIndex = absPathLen - 1;
 
     while (pathIndex > 0) : (pathIndex -= 1) {
-        if (buffer[pathIndex] == constants.UTF16_BACK_SLASH) {
+        if (buffer[pathIndex] == utf16BackSlash) {
             break;
         }
     }
@@ -61,13 +64,7 @@ pub inline fn exeDirPathToUiDllPath(exeDirPath: *AbsPath) void {
     exeDirPath.buffer[exeDirPath.len - 1] = 0; // Add Null Terminator
 }
 
-/// Returns full name of event of `code` to be used in `CreateEvent` or `OpenEvent`.
-/// Combines `constants.UI_DLL_CODE_EVENT_PREFIX` and provided `code`.
-pub fn getUiDllCodeEventName(code: constants.UiDllCode) *[:0]const u8 {
-    return constants.UI_DLL_CODE_EVENT_PREFIX ++ code;
-}
-
-/// Exits the process.
+/// Exits the current process.
 pub inline fn exit(exitCode: zigWin.UINT) noreturn {
     win.TerminateProcess(win.GetCurrentProcessId(), exitCode);
 }
@@ -77,7 +74,7 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 /// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
 ///
 /// Returns `zigWin.HANDLE` to the process or `null` in case of error.
-inline fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DWORD) ?zigWin.HANDLE {
+pub fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAccess: zigWin.DWORD) ?zigWin.HANDLE {
     const hwnd = win.FindWindowExW(
         null,
         null,
@@ -88,13 +85,14 @@ inline fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAcc
 
         return null;
     };
-    var pid: zigWin.DWORD = 0;
 
+    var pid: zigWin.DWORD = 0;
     if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
         @branchHint(.cold);
 
         return null;
     }
+
     return win.OpenProcess(
         dwDesiredAccess,
         win.FALSE,
@@ -105,7 +103,7 @@ inline fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAcc
 /// Allocates memory in process of `processHandler` and then writes `data` there.
 ///
 /// Returns start address of allocated memory or `null` in case of error.
-inline fn allocWriteProcessMemory(
+pub fn allocWriteProcessMemory(
     data: *const anyopaque,
     /// Size in bytes
     size: zigWin.SIZE_T,
@@ -132,4 +130,47 @@ inline fn allocWriteProcessMemory(
     }
 
     return startAddress;
+}
+
+/// Creates events via `CreateEventExW` for every element of `enumValues`.
+///
+/// Returns created array of event handles, where handles
+/// are located in strict order of `UiDllCodeEvent` enum fields.
+///
+/// Example:
+/// ```zig
+/// const Letter = enum(u32) {
+///   A,
+///   B,
+///   C,
+/// };
+/// const letterValues = @typeInfo(Letter).@"enum".field_values;
+///
+/// const events = createEventsFromEnum(letterValues, "Local\\\\Letter", win.EVENT_ALL_ACCESS);
+///
+/// // Created 'Local\\LetterA', 'Local\\LetterB', 'Local\\LetterC'
+///
+/// // `events[0]` is `Letter.A`, `events[1]` is `Letter.B` and so on
+/// ```
+/// Accessing `UiDllCode.Success` (the first field of `UiDllCode`) - `uiDllCodeEvents[0]`.
+pub inline fn createEventsFromEnum(
+    /// `field_values` of an `Enum`.
+    comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
+    /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    comptime namePrefix: [:0]const u8,
+    /// `dwDesiredAccess` parameter of `CreateEventExW`.
+    dwDesiredAccess: zigWin.DWORD,
+) [enumValues.len]zigWin.HANDLE {
+    const events: [enumValues.len]zigWin.HANDLE = undefined;
+
+    inline for (enumValues, 0..) |value, index| {
+        events[index] = win.CreateEventExW(
+            null,
+            unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
+            0,
+            dwDesiredAccess,
+        );
+    }
+
+    return events;
 }
