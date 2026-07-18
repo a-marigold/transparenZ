@@ -78,15 +78,6 @@ fn initXamlDiagnostics(
 ) callconv(.winapi) zigWin.DWORD {
     _ = lpParameter;
 
-    const uiDllCodeValues = @typeInfo(UiDllCode).@"enum".field_values;
-    const uiDllCodeEvents = utils.openEventsOfEnum(
-        uiDllCodeValues,
-
-        UiDllCode.EVENT_NAME_PREFIX,
-        win.FALSE,
-        UiDllCode.EVENT_DESIRED_ACCESS,
-    );
-
     const winUiXamlDll = win.LoadLibraryExW(
         unicode.utf8ToUtf16LeStringLiteral(win.WINDOWS_UI_XAML_DLL_NAME),
         null,
@@ -102,10 +93,10 @@ fn initXamlDiagnostics(
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
             _ = utils.setEventOfEnum(
-                UiDllCode,
+                UiDllCode.EVENT_NAME_PREFIX,
                 UiDllCode.GetExeDirFailed,
-                uiDllCodeValues,
-                uiDllCodeEvents,
+                UiDllCode.EVENT_DESIRED_ACCESS,
+                win.FALSE,
             );
 
             return 0;
@@ -129,10 +120,10 @@ fn initXamlDiagnostics(
 
     // Neccessarily indicate success
     _ = utils.setEventOfEnum(
-        UiDllCode,
+        UiDllCode.EVENT_NAME_PREFIX,
         UiDllCode.Success,
-        uiDllCodeValues,
-        uiDllCodeEvents,
+        UiDllCode.EVENT_DESIRED_ACCESS,
+        win.FALSE,
     );
 
     return 1;

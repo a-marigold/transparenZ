@@ -64,11 +64,6 @@ pub inline fn exeDirPathToUiDllPath(exeDirPath: *AbsPath) void {
     exeDirPath.buffer[exeDirPath.len - 1] = 0; // Add Null Terminator
 }
 
-/// Exits the current process.
-pub inline fn exit(exitCode: zigWin.UINT) noreturn {
-    win.TerminateProcess(win.GetCurrentProcessId(), exitCode);
-}
-
 /// Opens process which owns the window of `windowClassName`.
 ///
 /// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
@@ -118,7 +113,6 @@ pub fn allocWriteProcessMemory(
     ) orelse {
         return null;
     };
-
     if (win.WriteProcessMemory(
         processHandle,
         startAddress,
@@ -132,7 +126,14 @@ pub fn allocWriteProcessMemory(
     return startAddress;
 }
 
+/// Exits the current process.
+pub inline fn exit(exitCode: zigWin.UINT) noreturn {
+    win.TerminateProcess(win.GetCurrentProcessId(), exitCode);
+}
+
 /// Creates events via `CreateEventExW` for every element of `enumValues`.
+///
+/// Uses `getEventNameOfEnum` to create names for events.
 ///
 /// Returns created array of event handles, where handles
 /// are located in strict order of `enumValues`.
@@ -160,9 +161,9 @@ pub inline fn createEventsFromEnum(
     comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
     comptime namePrefix: []const u8,
-    /// `dwFlags` parameter of `CreateEventExW`.
+    /// To be passed to `CreateEventExW`.
     dwFlags: zigWin.DWORD,
-    /// `dwDesiredAccess` parameter of `CreateEventExW`.
+    /// To be passed to `CreateEventExW`.
     dwDesiredAccess: zigWin.DWORD,
 ) ?[enumValues.len]zigWin.HANDLE {
     var events: [enumValues.len]zigWin.HANDLE = undefined;
@@ -170,13 +171,14 @@ pub inline fn createEventsFromEnum(
     inline for (enumValues, 0..) |value, index| {
         const event = win.CreateEventExW(
             null,
-            unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
+            comptime unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
             dwFlags,
             dwDesiredAccess,
         );
 
         if (event == null) {
             @branchHint(.cold);
+
             return null;
         }
 
@@ -186,50 +188,24 @@ pub inline fn createEventsFromEnum(
     return events;
 }
 
-/// The same as `createEventsFromEnum`, but opens events (`OpenEventW`) instead of creating them.
+/// Calls `OpenEventW` with name `namePrefix ++ enumValue`,
+/// calls `SetEvent` with the event and closes it with `CloseHandle`.
 ///
-/// Returns array of opened events, where handles
-/// are located in strict order of `enumValues`.
-///
-/// If any call of `OpenEventW` fails, returns `null`.
-pub inline fn openEventsOfEnum(
-    comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
-    comptime namePrefix: []const u8,
-    /// `bInheritHandle` parameter of `OpenEventW`.
-    bInheritHandle: win.BOOL,
-    dwDesiredAccess: zigWin.DWORD,
-) ?[enumValues.len]zigWin.HANDLE {
-    var events: [enumValues.len]zigWin.HANDLE = undefined;
-
-    inline for (enumValues, 0..) |value, index| {
-        const event = win.OpenEventW(
-            dwDesiredAccess,
-            bInheritHandle,
-            unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
-        );
-
-        if (event == null) {
-            @branchHint(.cold);
-
-            return null;
-        }
-        events[index] = event;
-    }
-
-    return events;
-}
-
+/// Returns result of `SetEvent` call.
 pub inline fn setEventOfEnum(
-    comptime T: type,
-    comptime value: T,
-    comptime enumValues: @typeInfo(T).@"enum".field_values,
-    events: [enumValues.len]zigWin.HANDLE,
+    namePrefix: []const u8,
+    enumValue: comptime_int,
+    /// To be passed to `OpenEventW`.
+    dwDesiredAccess: zigWin.DWORD,
+    /// To be passed to `OpenEventW`.
+    bInheritHandle: win.BOOL,
 ) win.BOOL {
-    var valueIndex = comptime 0;
+    const event = win.OpenEventW(
+        dwDesiredAccess,
+        bInheritHandle,
+        unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ enumValue),
+    );
+    defer _ = win.CloseHandle(event);
 
-    inline while (enumValues[valueIndex] != value) {
-        valueIndex += 1;
-    }
-
-    return win.SetEvent(events[valueIndex]);
+    return win.SetEvent(event);
 }
