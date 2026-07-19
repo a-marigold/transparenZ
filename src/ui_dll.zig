@@ -86,7 +86,6 @@ fn initXamlDiagnostics(
 
     const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
         winUiXamlDll,
-
         "InitializeXamlDiagnostics",
     ));
 
@@ -107,16 +106,34 @@ fn initXamlDiagnostics(
         break :block exeDirPath;
     };
 
-    _ = initializeXamlDiagnosticsEx(
-        // Random, but unique string
-        unicode.utf8ToUtf16LeStringLiteral("tZy"),
+    // Name of diagnostics must be unique in the whole system.
+    //
+    // Start with 10 to have stable length.
+    // If start with 0-9 numbers, there is an unused whitespace
 
-        win.GetCurrentProcessId(),
-        null,
-        uiDllPath,
-        TaskbarHook.TASKBAR_HOOK_GUID,
-        null,
-    );
+    var diagnosticsName: [5]u16 = "tZy" ++ constants.UTF16_NUMBERS[10];
+
+    // Need to do multiple attempts 'cause when `explorer.exe`
+    // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
+
+    var attemptCount = 0;
+
+    while (attemptCount < 60) : ({
+        attemptCount += 1;
+
+        const nextDiagnosticsSuffix = constants.UTF16_NUMBERS[attemptCount + 10];
+        diagnosticsName[diagnosticsName.len - 2] = nextDiagnosticsSuffix[0];
+        diagnosticsName[diagnosticsName.len - 1] = nextDiagnosticsSuffix[1];
+    }) {
+        _ = initializeXamlDiagnosticsEx(
+            diagnosticsName,
+            win.GetCurrentProcessId(),
+            null,
+            uiDllPath,
+            TaskbarHook.TASKBAR_HOOK_GUID,
+            null,
+        );
+    }
 
     // Neccessarily indicate success
     _ = utils.setEventOfEnum(
