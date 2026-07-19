@@ -134,7 +134,7 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 
 /// Creates events via `CreateEventExW` for every element of `EnumValues`.
 ///
-/// Uses `getEventNameOfEnum` to create names for events.
+/// Uses `getEventNameOfEnumValue` to create names for events.
 ///
 /// Returns created array of event handles, where handles
 /// are located in strict order of `EnumValues`.
@@ -159,8 +159,8 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 pub fn createEventsFromEnum(
     /// `field_values` of an `Enum`.
     comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
-    /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
-    comptime namePrefix: []const u8,
+    /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    namePrefix: []const u8,
     /// To be passed to `CreateEventExW`.
     dwFlags: zigWin.DWORD,
     /// To be passed to `CreateEventExW`.
@@ -171,7 +171,7 @@ pub fn createEventsFromEnum(
     inline for (EnumValues, 0..) |value, index| {
         const event = win.CreateEventExW(
             null,
-            comptime unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
+            comptime getEventNameOfEnumValue(namePrefix, value),
             dwFlags,
             dwDesiredAccess,
         );
@@ -191,9 +191,12 @@ pub fn createEventsFromEnum(
 /// Calls `OpenEventW` with name `namePrefix ++ EnumValue`,
 /// calls `SetEvent` with the event and closes it with `CloseHandle`.
 ///
+/// Uses `getEventNameOfEnumValue` to create names for events.
+///
 /// Returns result of `SetEvent` call.
 pub inline fn setEventOfEnum(
-    comptime namePrefix: []const u8,
+    /// mMust be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    namePrefix: []const u8,
     comptime EnumValue: comptime_int,
     /// To be passed to `OpenEventW`.
     dwDesiredAccess: zigWin.DWORD,
@@ -203,12 +206,20 @@ pub inline fn setEventOfEnum(
     const event = win.OpenEventW(
         dwDesiredAccess,
         bInheritHandle,
-        unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ EnumValue),
+        comptime getEventNameOfEnumValue(namePrefix, EnumValue),
     );
 
     defer _ = win.CloseHandle(event);
 
     return win.SetEvent(event);
+}
+/// Returns `namePrefix ++ EnumValue`.
+fn getEventNameOfEnumValue(
+    /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    namePrefix: []const u8,
+    comptime EnumValue: comptime_int,
+) []const u16 {
+    return unicode.utf8ToUtf16LeStringLiteral(namePrefix) ++ constants.UTF16_NUMBERS[EnumValue];
 }
 
 /// Converts comptime `enumValues` to runtime array with `tagType` elements type.
@@ -220,6 +231,7 @@ pub inline fn getRuntimeEnumValues(
     inline for (EnumValues, 0..) |value, index| {
         result[index] = value;
     }
+
     return result;
 }
 
@@ -240,16 +252,12 @@ pub fn uintToUtf16(comptime T: type, value: T, buffer: []u16) usize {
 
     var index = buffer.len;
 
-    while (value >= 10) {
+    // Not just 'value != 0' 'cause it should handle '0'
+    while (value >= 10) : (value = @divTrunc(value, 10)) {
         index -= 1;
-
         buffer[index] = @intCast(zeroChar + @mod(value, 10));
-
-        value = @divTrunc(value, 10);
     }
-
     index -= 1;
-
     buffer[index] = @intCast(zeroChar + value);
 
     return index;
