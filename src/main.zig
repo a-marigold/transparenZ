@@ -70,15 +70,21 @@ pub fn main() void {
         "LoadLibraryW",
     );
 
-    const uiDllCodeValues = @typeInfo(UiDllCode).@"enum".field_values;
+    const UiDllCodeInfo = @typeInfo(UiDllCode).@"enum";
+
+    const UiDllCodeValues = UiDllCodeInfo.field_values;
 
     // Create events before injection
     const uiDllCodeEvents = utils.createEventsFromEnum(
-        uiDllCodeValues,
-        UiDllCode.EVENT_PREFIX,
+        UiDllCodeValues,
+        UiDllCode.EVENT_NAME_PREFIX,
         0,
         UiDllCode.EVENT_DESIRED_ACCESS,
-    );
+    ) orelse {
+        @branchHint(.cold);
+
+        @panic(errors.UI_DLL_CODE_EVENT_CREATION_FAILED);
+    };
 
     _ = win.CreateRemoteThread(
         explorerProcess,
@@ -95,7 +101,6 @@ pub fn main() void {
     const waitResult = win.WaitForMultipleObjects(
         waitCount,
         &uiDllCodeEvents,
-
         win.FALSE,
         32_000,
     );
@@ -106,15 +111,24 @@ pub fn main() void {
         @panic(errors.WAIT_UI_DLL_FAIL);
     }
 
-    const eventIndex = waitResult - win.WAIT_OBJECT_0;
+    const runtimeUiDllCodeValues = utils.getRuntimeEnumValues(
+        UiDllCodeValues,
+        UiDllCodeInfo.tag_type,
+    );
 
-    switch (uiDllCodeValues[eventIndex]) {
-        UiDllCode.Success => {
+    const eventIndex = waitResult - win.WAIT_OBJECT_0;
+    // `eventIndex` is exactly less than `uiDllCodeValues.len`
+    // 'cause `WAIT_TIMEOUT` and `WAIT_FAILED` are checked,
+    // and `WAIT_ABANDONED` appears only for mutexes, not for events
+    switch (runtimeUiDllCodeValues[eventIndex]) {
+        @intFromEnum(UiDllCode.Success) => {
             utils.exit(0);
         },
-
-        UiDllCode.GetExeDirFailed => {
+        @intFromEnum(UiDllCode.GetExeDirFailed) => {
             @panic(errors.UI_DLL_GET_EXE_PATH_FAIL);
+        },
+        else => {
+            unreachable;
         },
     }
 }
