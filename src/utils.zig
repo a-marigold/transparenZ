@@ -35,7 +35,7 @@ pub fn getExeDirPath() ?AbsPath {
         return null;
     }
 
-    const utf16BackSlash = unicode.utf8ToUtf16LeStringLiteral("\\")[0];
+    const utf16BackSlash: u16 = '\\';
 
     var pathIndex = absPathLen - 1;
 
@@ -128,15 +128,16 @@ pub fn allocWriteProcessMemory(
 
 /// Exits the current process.
 pub inline fn exit(exitCode: zigWin.UINT) noreturn {
-    win.TerminateProcess(win.GetCurrentProcess(), exitCode);
+    _ = win.TerminateProcess(win.GetCurrentProcess(), exitCode);
+    unreachable;
 }
 
-/// Creates events via `CreateEventExW` for every element of `enumValues`.
+/// Creates events via `CreateEventExW` for every element of `EnumValues`.
 ///
 /// Uses `getEventNameOfEnum` to create names for events.
 ///
 /// Returns created array of event handles, where handles
-/// are located in strict order of `enumValues`.
+/// are located in strict order of `EnumValues`.
 ///
 /// If any call of `CreateEventExW` fails, returns `null`.
 ///
@@ -155,20 +156,19 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 ///
 /// // `events[0]` is `Letter.A`, `events[1]` is `Letter.B` and so on
 /// ```
-/// Accessing `UiDllCode.Success` (the first field of `UiDllCode`) - `uiDllCodeEvents[0]`.
 pub fn createEventsFromEnum(
     /// `field_values` of an `Enum`.
-    comptime enumValues: @FieldType(std.lang.Type.Enum, "field_values"),
+    comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     /// Prefix name of events. It must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
     comptime namePrefix: []const u8,
     /// To be passed to `CreateEventExW`.
     dwFlags: zigWin.DWORD,
     /// To be passed to `CreateEventExW`.
     dwDesiredAccess: zigWin.DWORD,
-) ?[enumValues.len]zigWin.HANDLE {
-    var events: [enumValues.len]zigWin.HANDLE = undefined;
+) ?[EnumValues.len]zigWin.HANDLE {
+    var events: [EnumValues.len]zigWin.HANDLE = undefined;
 
-    inline for (enumValues, 0..) |value, index| {
+    inline for (EnumValues, 0..) |value, index| {
         const event = win.CreateEventExW(
             null,
             comptime unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ value),
@@ -188,13 +188,13 @@ pub fn createEventsFromEnum(
     return events;
 }
 
-/// Calls `OpenEventW` with name `namePrefix ++ enumValue`,
+/// Calls `OpenEventW` with name `namePrefix ++ EnumValue`,
 /// calls `SetEvent` with the event and closes it with `CloseHandle`.
 ///
 /// Returns result of `SetEvent` call.
 pub inline fn setEventOfEnum(
-    namePrefix: []const u8,
-    enumValue: comptime_int,
+    comptime namePrefix: []const u8,
+    comptime EnumValue: comptime_int,
     /// To be passed to `OpenEventW`.
     dwDesiredAccess: zigWin.DWORD,
     /// To be passed to `OpenEventW`.
@@ -203,9 +203,22 @@ pub inline fn setEventOfEnum(
     const event = win.OpenEventW(
         dwDesiredAccess,
         bInheritHandle,
-        unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ enumValue),
+        unicode.utf8ToUtf16LeStringLiteral(namePrefix ++ EnumValue),
     );
+
     defer _ = win.CloseHandle(event);
 
     return win.SetEvent(event);
+}
+
+/// Converts comptime `enumValues` to runtime array with `tagType` elements type.
+pub inline fn getRuntimeEnumValues(
+    comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
+    comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
+) [EnumValues.len]TagType {
+    var result: [EnumValues.len]TagType = undefined;
+    inline for (EnumValues, 0..) |value, index| {
+        result[index] = value;
+    }
+    return result;
 }
