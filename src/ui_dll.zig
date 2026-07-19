@@ -1,8 +1,8 @@
 //! Updates the taskbar UI.
 //!
-//! First injected to `explorer.exe` and then used as DLL for `InitializeXamlDiagnosticsEx`.
+//! First it is injected to `explorer.exe` and then used as DLL for `InitializeXamlDiagnosticsEx`.
 //!
-//! Compile file must be named `ui.dll` (see the `constants.zig`).
+//! Compiled file must be named `ui.dll` (see the `constants.zig`).
 
 const std = @import("std");
 const unicode = std.unicode;
@@ -29,9 +29,9 @@ export fn DllMain(
     if (fwdReason == win.DLL_PROCESS_ATTACH) {
         _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
 
-        // New thread is used 'cause `initXamlDiagnostics`
+        // New thread is used 'cause `initXamlDiags`
         // loads libraries and can cause loader lock
-        const thread = utils.createThread(&initXamlDiagnostics, null);
+        const thread = utils.createThread(&initXamlDiags, null);
 
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
@@ -64,9 +64,9 @@ export fn DllGetClassObject(
 /// Loads `Windows.Ui.Xaml.dll` and calls `InitializeXamlDiagnosticsEx`.
 ///
 /// `InitializeXamlDiagnosticsEx` loads this dll again, calls `DllGetClassObject`,
-/// and if it succeed `taskbarHook.xamlDiagnosticsInterface` has `IXamlDiagnostics`,
+/// and if it succeed `taskbarHook.xamlDiagsInterface` has `IXamlDiagnostics`,
 /// which is used to style taskbar.
-fn initXamlDiagnostics(
+fn initXamlDiags(
     /// Used in `CreateThread` so this parameter is needed.
     lpParameter: ?zigWin.LPVOID,
 ) callconv(.winapi) zigWin.DWORD {
@@ -107,7 +107,7 @@ fn initXamlDiagnostics(
     // Start with 10 to have stable length.
     // If start with 0-9 numbers, there is an unused whitespace
 
-    var diagnosticsName: [5]u16 = "tZy" ++ constants.UTF16_NUMBERS[10];
+    var diagsName: [5]u16 = "tZy" ++ constants.UTF16_NUMBERS[10];
 
     // Need to do multiple attempts 'cause when `explorer.exe`
     // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
@@ -117,20 +117,20 @@ fn initXamlDiagnostics(
     while (attemptCount < 60) : ({
         attemptCount += 1;
 
-        const nextDiagnosticsSuffix = constants.UTF16_NUMBERS[attemptCount + 10];
+        const diagsNameCount = constants.UTF16_NUMBERS[attemptCount + 10];
 
-        diagnosticsName[diagnosticsName.len - 2] = nextDiagnosticsSuffix[0];
-        diagnosticsName[diagnosticsName.len - 1] = nextDiagnosticsSuffix[1];
+        diagsName[diagsName.len - 2] = diagsNameCount[0];
+        diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
         // Call `InitializeXamlDiagnosticsEx` in another thread
         // 'cause it works only once per thread
 
         utils.joinThread(
             utils.createThread(
-                initXamlDiagnosticsRoutine,
-                InitXamlDiagnosticsRoutineContext{
+                &initXamlDiagsRoutine,
+                InitXamlDiagsRoutineContext{
                     .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
-                    .endPointName = diagnosticsName,
+                    .endPointName = diagsName,
                     .pid = currentPid,
                     .wszTAPDllName = uiDllPath,
                     .tapClsid = TaskbarHook.TASKBAR_HOOK_GUID,
@@ -150,11 +150,11 @@ fn initXamlDiagnostics(
     return 1;
 }
 
-const InitXamlDiagnosticsRoutineContext = struct {
+const InitXamlDiagsRoutineContext = struct {
     /// Pointer to the `InitializeXamlDiagnosticsEx` function.
     initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
 
-    // `InitialzieXamlDiagnosticsEx` parameters
+    // `InitializeXamlDiagnosticsEx` parameters.
 
     endPointName: []const u16,
     pid: zigWin.DWORD,
@@ -163,8 +163,8 @@ const InitXamlDiagnosticsRoutineContext = struct {
 };
 
 /// Used as start routine of a thread in `initXamlDiagnostics`.
-export fn initXamlDiagnosticsRoutine(
-    context: InitXamlDiagnosticsRoutineContext,
+export fn initXamlDiagsRoutine(
+    context: InitXamlDiagsRoutineContext,
 ) callconv(.winapi) @typeInfo(win.InitializeXamlDiagnosticsEx).@"fn".return_type {
     return context.initializeXamlDiagnosticsEx(
         context.endPointName,
@@ -175,5 +175,3 @@ export fn initXamlDiagnosticsRoutine(
         null,
     );
 }
-
-// TODO: make every name containing 'diagnostics' contain 'diags'

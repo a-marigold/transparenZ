@@ -20,16 +20,16 @@ vtable: *const win.IObjectWithSite.VTable,
 
 /// Pointer to `IXamlDiagnostics`.
 ///
-/// Initialized in `tapSite.vtable.SetSite`,
+/// Initialized in `taskbarHook.vtable.SetSite`,
 /// when windows calls this function after executing `DllGetClassObject`.
-xamlDiagnosticsInterface: ?*win.IUnknown,
+iXamlDiagnostics: ?*win.IUnknown,
 
-/// `AddRef` and `Release` no-op implemenation of `tapSite`.
+/// `AddRef` and `Release` no-op implemenation of `taskbarHook`.
 ///
-/// It is no-op 'cause `tapSite` is a singleton and it is useless to manage its lifetime
+/// It is no-op 'cause `taskbarHook` is a singleton and it is useless to manage its lifetime
 fn refMangingNoopFn(self: *anyopaque) callconv(.winapi) zigWin.ULONG {
     _ = self;
-    // Returning `1` means `tapSite`'s ref count is one
+    // Returning `1` means `taskbarHook`'s ref count is one
     return 1;
 }
 
@@ -64,14 +64,14 @@ pub var taskbarHook: TaskbarHook = .{
                     return iUnknown.vtable.QueryInterface(
                         @ptrCast(iUnknown),
                         &win.IID_IXamlDiagnostics,
-                        @ptrCast(&taskbarHookSelf.xamlDiagnosticsInterface),
+                        @ptrCast(&taskbarHookSelf.iXamlDiagnostics),
                     );
                 }
 
-                if (taskbarHookSelf.xamlDiagnosticsInterface) |xamlDiagnosticsInterface| {
-                    _ = xamlDiagnosticsInterface.vtable.Release(xamlDiagnosticsInterface);
+                if (taskbarHookSelf.iXamlDiagnostics) |iXamlDiagnostics| {
+                    _ = iXamlDiagnostics.vtable.Release(iXamlDiagnostics);
 
-                    taskbarHookSelf.xamlDiagnosticsInterface = null;
+                    taskbarHookSelf.iXamlDiagnostics = null;
                 }
 
                 return .S_OK;
@@ -94,5 +94,5 @@ pub var taskbarHook: TaskbarHook = .{
             }
         }.GetSite,
     },
-    .xamlDiagnosticsInterface = null,
+    .iXamlDiagnostics = null,
 };
