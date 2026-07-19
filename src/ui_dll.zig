@@ -31,14 +31,8 @@ export fn DllMain(
 
         // New thread is used 'cause `initXamlDiagnostics`
         // loads libraries and can cause loader lock
-        const thread = win.CreateThread(
-            null,
-            0,
-            &initXamlDiagnostics,
-            null,
-            0,
-            null,
-        );
+        const thread = utils.createThread(&initXamlDiagnostics, null);
+
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
 
@@ -106,6 +100,8 @@ fn initXamlDiagnostics(
         break :block exeDirPath;
     };
 
+    const currentPid = win.GetCurrentProcessId();
+
     // Name of diagnostics must be unique in the whole system.
     //
     // Start with 10 to have stable length.
@@ -122,16 +118,24 @@ fn initXamlDiagnostics(
         attemptCount += 1;
 
         const nextDiagnosticsSuffix = constants.UTF16_NUMBERS[attemptCount + 10];
+
         diagnosticsName[diagnosticsName.len - 2] = nextDiagnosticsSuffix[0];
         diagnosticsName[diagnosticsName.len - 1] = nextDiagnosticsSuffix[1];
     }) {
-        _ = initializeXamlDiagnosticsEx(
-            diagnosticsName,
-            win.GetCurrentProcessId(),
-            null,
-            uiDllPath,
-            TaskbarHook.TASKBAR_HOOK_GUID,
-            null,
+        // Call `InitializeXamlDiagnosticsEx` in another thread
+        // 'cause it works only once per thread
+
+        utils.joinThread(
+            utils.createThread(
+                initXamlDiagnosticsRoutine,
+                InitXamlDiagnosticsRoutineContext{
+                    .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
+                    .endPointName = diagnosticsName,
+                    .pid = currentPid,
+                    .wszTAPDllName = uiDllPath,
+                    .tapClsid = TaskbarHook.TASKBAR_HOOK_GUID,
+                },
+            ),
         );
     }
 
@@ -145,3 +149,31 @@ fn initXamlDiagnostics(
 
     return 1;
 }
+
+const InitXamlDiagnosticsRoutineContext = struct {
+    /// Pointer to the `InitializeXamlDiagnosticsEx` function.
+    initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
+
+    // `InitialzieXamlDiagnosticsEx` parameters
+
+    endPointName: []const u16,
+    pid: zigWin.DWORD,
+    wszTAPDllName: []const u16,
+    tapClsid: *const zigWin.GUID,
+};
+
+/// Used as start routine of a thread in `initXamlDiagnostics`.
+export fn initXamlDiagnosticsRoutine(
+    context: InitXamlDiagnosticsRoutineContext,
+) callconv(.winapi) @typeInfo(win.InitializeXamlDiagnosticsEx).@"fn".return_type {
+    return context.initializeXamlDiagnosticsEx(
+        context.endPointName,
+        context.pid,
+        null,
+        context.wszTAPDllName,
+        context.tapClsid,
+        null,
+    );
+}
+
+// TODO: make every name containing 'diagnostics' contain 'diags'
