@@ -234,31 +234,3 @@ pub inline fn getRuntimeEnumValues(
 
     return result;
 }
-
-/// Turns an unsinged integer to UTF-16 byte sequence and writes it to `buffer`.
-///
-/// Writes to `buffer` starting from the end, that is, the beginning of `buffer` is untouched.
-///
-/// To get a valid UTF-16 number, call `@memmove` to move bytes of `buffer`
-/// starting from the return value to start of `buffer`, or just use slice of `buffer` which starts from return value.
-///
-/// Return value is the index from which payload starts in `buffer`.
-pub fn uintToUtf16(comptime T: type, value: T, buffer: []u16) usize {
-    if (@typeInfo(T).int.signedness == .singed) {
-        @compileError("Only unsigned integers are allowed.");
-    }
-
-    const zeroChar = '0';
-
-    var index = buffer.len;
-
-    // Not just 'value != 0' 'cause it should handle '0'
-    while (value >= 10) : (value = @divTrunc(value, 10)) {
-        index -= 1;
-        buffer[index] = @intCast(zeroChar + @mod(value, 10));
-    }
-    index -= 1;
-    buffer[index] = @intCast(zeroChar + value);
-
-    return index;
-}
