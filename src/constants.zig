@@ -1,13 +1,15 @@
 const std = @import("std");
-const unicode = std.unicode;
 const zigWin = std.os.windows;
 
 const win = @import("win.zig");
+
+const utils = @import("utils.zig");
 
 pub const UI_DLL_FILE_NAME = "ui.dll";
 
 // const ACCENT_POLICY: win.ACCENT_POLICY = .{
 //     .AccentState = .ACCENT_ENABLE_ACRYLICBLURBEHIND,
+//
 //     .AccentFlags = 0,
 //     .GradientColor = 0x010000,
 
@@ -27,6 +29,8 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 /// When taskbar is succesfully styled or an error appears,
 /// `ui.dll` calls `SetEvent` with corresponding event name.
 ///
+/// `ui.dll` MUST set `UiDllCode.Success` if it ended successfully.
+///
 /// Example of how event names combined:
 ///
 /// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\\\\SomePrefix1"`.
@@ -35,7 +39,7 @@ pub const UiDllCode = enum(u32) {
     GetExeDirFailed,
 
     /// See `UiDllCode`.
-    pub const EVENT_PREFIX = "Local\\\\tZyC";
+    pub const EVENT_NAME_PREFIX = "Local\\\\tZyC";
 
     /// Desired access of events created from `UiDllCode` enum.
     pub const EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
@@ -51,6 +55,29 @@ pub const errors = struct {
     pub const WAIT_UI_DLL_TIMEOUT = "Waiting time of '" ++ UI_DLL_FILE_NAME ++ "' completion expired.";
     pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
 
+    pub const UI_DLL_CODE_EVENT_CREATION_FAILED = "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
+
     // `ui.dll` errors
     pub const UI_DLL_GET_EXE_PATH_FAIL = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+};
+
+/// Contains numbers from 0 to `quantity` converted to UTF-16.
+///
+/// Used not to convert numbers to UTF-16 in runtime.
+///
+/// `quantity` is increased on demand.
+/// That is, when a part of application using this array needs more numbers, the array is expanded.
+///
+/// For example, to convert 16 to UTF-16, use `UTF16_NUMBERS[16]`.
+pub const UTF16_NUMBERS = numberBlock: {
+    const quantity = 20;
+
+    var numbers: [quantity][]const u16 = undefined;
+
+    var number = 0;
+    while (number < quantity) : (number += 1) {
+        const utf16Number = std.fmt.comptimePrint("{}", .{number});
+        numbers[number] = utf16Number;
+    }
+    break :numberBlock numbers;
 };
