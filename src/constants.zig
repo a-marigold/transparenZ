@@ -54,7 +54,6 @@ pub const MainErrors = struct {
 
     pub const ALLOC_UI_DLL_FILE_NAME_FAIL = "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' string in explorer.exe.";
 
-    pub const WAIT_UI_DLL_TIMEOUT = "Waiting time of '" ++ UI_DLL_FILE_NAME ++ "' completion expired.";
     pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
 
     pub const UI_DLL_CODE_EVENT_CREATION_FAILED = "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
@@ -62,7 +61,7 @@ pub const MainErrors = struct {
 
 /// Array with error messages appearing only in `ui.dll`.
 ///
-/// Every error is at index which equals corresponding `UiDllCode`.
+/// Indexes of this array are codes of `UiDllCode`.
 ///
 /// That is, to access, for example, message of `InitXamlDiagsFail`, do `UI_DLL_ERRORS[UiDllCode.InitXamlDiagsFail]`.
 ///

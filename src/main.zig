@@ -104,9 +104,7 @@ pub fn main() void {
         win.INFINITE,
     );
 
-    if (waitResult == win.WAIT_TIMEOUT) {
-        @panic(MainErrors.WAIT_UI_DLL_TIMEOUT);
-    } else if (waitResult == win.WAIT_FAILED) {
+    if (waitResult == win.WAIT_FAILED) {
         @panic(MainErrors.WAIT_UI_DLL_FAIL);
     }
 
