@@ -87,7 +87,7 @@ fn initXamlDiags(
         var exeDirPath = utils.getExeDirPath() orelse {
             _ = utils.setEventOfEnum(
                 UiDllCode.EVENT_NAME_PREFIX,
-                UiDllCode.GetExeDirFailed,
+                UiDllCode.GetExeDirFail,
                 UiDllCode.EVENT_DESIRED_ACCESS,
             );
 
@@ -110,9 +110,12 @@ fn initXamlDiags(
 
     // Need to do multiple attempts 'cause when `explorer.exe`
     // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
+
+    const maxAttemptCount = 60;
+
     var attemptCount = 0;
 
-    while (attemptCount < 60) : ({
+    while (attemptCount < maxAttemptCount) : ({
         attemptCount += 1;
 
         const diagsNameCount = constants.UTF16_NUMBERS[attemptCount + 10];
@@ -144,10 +147,11 @@ fn initXamlDiags(
             break;
         }
     }
-    if (attemptCount == 60) {
+
+    if (attemptCount == maxAttemptCount) {
         _ = utils.setEventOfEnum(
             UiDllCode.EVENT_NAME_PREFIX,
-            UiDllCode.InitXamlDiagsFailed,
+            UiDllCode.InitXamlDiagsFail,
             UiDllCode.EVENT_DESIRED_ACCESS,
         );
     }

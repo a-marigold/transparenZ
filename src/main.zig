@@ -7,7 +7,7 @@ const constants = @import("constants.zig");
 
 const utils = @import("utils.zig");
 
-const errors = constants.errors;
+const MainErrors = constants.MainErrors;
 
 const UiDllCode = constants.UiDllCode;
 
@@ -40,14 +40,14 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic(errors.OPEN_EXPLORER_FAIL);
+        @panic(MainErrors.OPEN_EXPLORER_FAIL);
     };
 
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
             @branchHint(.cold);
 
-            @panic(errors.GET_EXE_PATH_FAIL);
+            @panic(MainErrors.GET_EXE_PATH_FAIL);
         };
 
         utils.exeDirPathToUiDllPath(&exeDirPath);
@@ -62,7 +62,7 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic(errors.ALLOC_UI_DLL_FILE_NAME_FAIL);
+        @panic(MainErrors.ALLOC_UI_DLL_FILE_NAME_FAIL);
     };
 
     const loadLibraryW = win.GetProcAddress(
@@ -83,7 +83,7 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic(errors.UI_DLL_CODE_EVENT_CREATION_FAILED);
+        @panic(MainErrors.UI_DLL_CODE_EVENT_CREATION_FAILED);
     };
 
     _ = win.CreateRemoteThread(
@@ -96,27 +96,25 @@ pub fn main() void {
         null,
     );
 
-    const waitCount = uiDllCodeEvents.len;
-
     const waitResult = win.WaitForMultipleObjects(
-        waitCount,
+        uiDllCodeEvents.len,
         &uiDllCodeEvents,
         win.FALSE,
-        32_000,
+        win.INFINITE,
     );
 
     if (waitResult == win.WAIT_TIMEOUT) {
-        @panic(errors.WAIT_UI_DLL_TIMEOUT);
+        @panic(MainErrors.WAIT_UI_DLL_TIMEOUT);
     } else if (waitResult == win.WAIT_FAILED) {
-        @panic(errors.WAIT_UI_DLL_FAIL);
+        @panic(MainErrors.WAIT_UI_DLL_FAIL);
     }
 
-    const runtimeUiDllCodeValues = utils.getRuntimeEnumValues(
+    const runtimeUiDllCodeValues = comptime utils.getRuntimeEnumValues(
         UiDllCodeValues,
         UiDllCodeInfo.tag_type,
     );
-
     const eventIndex = waitResult - win.WAIT_OBJECT_0;
+
     // `eventIndex` is exactly less than `uiDllCodeValues.len`
     // 'cause `WAIT_TIMEOUT` and `WAIT_FAILED` are checked,
     // and `WAIT_ABANDONED` appears only for mutexes, not for events
@@ -124,8 +122,11 @@ pub fn main() void {
         @intFromEnum(UiDllCode.Success) => {
             utils.exit(0);
         },
-        @intFromEnum(UiDllCode.GetExeDirFailed) => {
-            @panic(errors.UI_DLL_GET_EXE_PATH_FAIL);
+        @intFromEnum(UiDllCode.GetExeDirFail) => {
+            @panic(MainErrors.UI_DLL_GET_EXE_PATH_FAIL);
+        },
+        @intFromEnum(UiDllCode.InitXamlDiagsFail) => {
+            @panic(MainErrors.UI_DLL_INIT_XAML_DIAGS_FAIL);
         },
         else => {
             unreachable;

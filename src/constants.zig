@@ -36,8 +36,8 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 /// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\\\\SomePrefix1"`.
 pub const UiDllCode = enum(u32) {
     Success,
-    GetExeDirFailed,
-    InitXamlDiagsFailed,
+    GetExeDirFail,
+    InitXamlDiagsFail,
 
     /// See `UiDllCode`.
     pub const EVENT_NAME_PREFIX = "Local\\\\tZyC";
@@ -46,7 +46,7 @@ pub const UiDllCode = enum(u32) {
     pub const EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
 };
 
-pub const errors = struct {
+pub const MainErrors = struct {
     // main process errors
     pub const OPEN_EXPLORER_FAIL = "Failed to open 'explorer.exe' process.";
     pub const GET_EXE_PATH_FAIL = "Failed to get path to the 'transparenZ' executable.";
@@ -60,6 +60,7 @@ pub const errors = struct {
 
     // `ui.dll` errors
     pub const UI_DLL_GET_EXE_PATH_FAIL = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+    pub const UI_DLL_INIT_XAML_DIAGS_FAIL = "Failed to initialize xaml diagnostics in '" ++ UI_DLL_FILE_NAME ++ "'.";
 };
 
 /// Contains numbers from 0 to `quantity` converted to UTF-16.
@@ -70,15 +71,13 @@ pub const errors = struct {
 /// That is, when a part of application using this array needs more numbers, the array is expanded.
 ///
 /// For example, to convert 16 to UTF-16, use `UTF16_NUMBERS[16]`.
-pub const UTF16_NUMBERS = numberBlock: {
+pub const UTF16_NUMBERS = block: {
     const quantity = 20;
 
     var numbers: [quantity][]const u16 = undefined;
-
     var number = 0;
     while (number < quantity) : (number += 1) {
-        const utf16Number = std.fmt.comptimePrint("{}", .{number});
-        numbers[number] = utf16Number;
+        numbers[number] = std.fmt.comptimePrint("{d}", .{number});
     }
-    break :numberBlock numbers;
+    break :block numbers;
 };
