@@ -80,7 +80,7 @@ fn initXamlDiags(
 
     const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
         winUiXamlDll,
-        "InitializeXamlDiagnostics",
+        "InitializeXamlDiagnosticsEx",
     ));
 
     const uiDllPath = block: {
