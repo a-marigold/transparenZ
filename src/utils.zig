@@ -126,6 +126,31 @@ pub fn allocWriteProcessMemory(
     return startAddress;
 }
 
+/// High-level wrapper of `CreateThread` win api.
+///
+/// Returns handle to created thread or `null` in case of error.
+pub inline fn createThread(
+    startRoutine: *const zigWin.THREAD_START_ROUTINE,
+    /// Passed to `CreateThread` as `lpParameter`.
+    routineArg: ?*anyopaque,
+) ?zigWin.HANDLE {
+    return win.CreateThread(
+        null,
+        0,
+        startRoutine,
+        routineArg,
+        0,
+        null,
+    );
+}
+
+/// Waits for `thread` and then closes the handle.
+pub inline fn joinThread(thread: zigWin.HANDLE) void {
+    _ = win.WaitForSingleObject(thread, win.INFINITE);
+
+    _ = win.CloseHandle(thread);
+}
+
 /// Exits the current process.
 pub inline fn exit(exitCode: zigWin.UINT) noreturn {
     _ = win.TerminateProcess(win.GetCurrentProcess(), exitCode);
@@ -200,12 +225,10 @@ pub inline fn setEventOfEnum(
     comptime EnumValue: comptime_int,
     /// To be passed to `OpenEventW`.
     dwDesiredAccess: zigWin.DWORD,
-    /// To be passed to `OpenEventW`.
-    bInheritHandle: win.BOOL,
 ) win.BOOL {
     const event = win.OpenEventW(
         dwDesiredAccess,
-        bInheritHandle,
+        win.FALSE,
         comptime getEventNameOfEnumValue(namePrefix, EnumValue),
     );
 
@@ -213,6 +236,9 @@ pub inline fn setEventOfEnum(
 
     return win.SetEvent(event);
 }
+
+/// Intended to be called at comptime.
+///
 /// Returns `namePrefix ++ EnumValue`.
 fn getEventNameOfEnumValue(
     /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
@@ -222,8 +248,10 @@ fn getEventNameOfEnumValue(
     return unicode.utf8ToUtf16LeStringLiteral(namePrefix) ++ constants.UTF16_NUMBERS[EnumValue];
 }
 
+/// Intended to be called at comptime.
+///
 /// Converts comptime `enumValues` to runtime array with `tagType` elements type.
-pub inline fn getRuntimeEnumValues(
+pub fn getRuntimeEnumValues(
     comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
 ) [EnumValues.len]TagType {

@@ -89,7 +89,6 @@ fn initXamlDiags(
                 UiDllCode.EVENT_NAME_PREFIX,
                 UiDllCode.GetExeDirFailed,
                 UiDllCode.EVENT_DESIRED_ACCESS,
-                win.FALSE,
             );
 
             return 0;
@@ -150,7 +149,6 @@ fn initXamlDiags(
             UiDllCode.EVENT_NAME_PREFIX,
             UiDllCode.InitXamlDiagsFailed,
             UiDllCode.EVENT_DESIRED_ACCESS,
-            win.FALSE,
         );
     }
 
@@ -159,7 +157,6 @@ fn initXamlDiags(
         UiDllCode.EVENT_NAME_PREFIX,
         UiDllCode.Success,
         UiDllCode.EVENT_DESIRED_ACCESS,
-        win.FALSE,
     );
 
     return 1;
