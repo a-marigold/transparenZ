@@ -36,6 +36,7 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 /// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\\\\SomePrefix1"`.
 pub const UiDllCode = enum(u32) {
     Success,
+
     GetExeDirFail,
     InitXamlDiagsFail,
 
@@ -46,8 +47,8 @@ pub const UiDllCode = enum(u32) {
     pub const EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
 };
 
+/// Messages of errors appearing only in the main process.
 pub const MainErrors = struct {
-    // main process errors
     pub const OPEN_EXPLORER_FAIL = "Failed to open 'explorer.exe' process.";
     pub const GET_EXE_PATH_FAIL = "Failed to get path to the 'transparenZ' executable.";
 
@@ -57,10 +58,23 @@ pub const MainErrors = struct {
     pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
 
     pub const UI_DLL_CODE_EVENT_CREATION_FAILED = "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
+};
 
-    // `ui.dll` errors
-    pub const UI_DLL_GET_EXE_PATH_FAIL = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
-    pub const UI_DLL_INIT_XAML_DIAGS_FAIL = "Failed to initialize xaml diagnostics in '" ++ UI_DLL_FILE_NAME ++ "'.";
+/// Array with error messages appearing only in `ui.dll`.
+///
+/// Every error is at index which equals corresponding `UiDllCode`.
+///
+/// That is, to access, for example, message of `InitXamlDiagsFail`, do `UI_DLL_ERRORS[UiDllCode.InitXamlDiagsFail]`.
+///
+/// `UI_DLL_ERRORS[UiDllCode.Success]` causes undefined behavior 'cause `UiDllCode.Success` index of this array is not filled.
+pub const UI_DLL_ERRORS = block: {
+    var errors: [@typeInfo(UiDllCode).@"enum".field_values.len][:0]const u8 = undefined;
+
+    errors[UiDllCode.GetExeDirFail] = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+
+    errors[UiDllCode.InitXamlDiagsFail] = "Failed to initialize xaml diagnostics in '" ++ UI_DLL_FILE_NAME ++ "'.";
+
+    break :block errors;
 };
 
 /// Contains numbers from 0 to `quantity` converted to UTF-16.

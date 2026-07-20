@@ -8,6 +8,7 @@ const constants = @import("constants.zig");
 const utils = @import("utils.zig");
 
 const MainErrors = constants.MainErrors;
+const UI_DLL_ERRORS = constants.UI_DLL_ERRORS;
 
 const UiDllCode = constants.UiDllCode;
 
@@ -111,25 +112,18 @@ pub fn main() void {
 
     const runtimeUiDllCodeValues = comptime utils.getRuntimeEnumValues(
         UiDllCodeValues,
+
         UiDllCodeInfo.tag_type,
     );
+
+    // `eventIndex` is exactly less than `runtimeUiDllCodeValues` length:
+    // `WAIT_TIMEOUT` cannot appear here, `WAIT_FAILED` is checked,
+    // and `WAIT_ABANDONED` appears only for mutexes, not for events
     const eventIndex = waitResult - win.WAIT_OBJECT_0;
 
-    // `eventIndex` is exactly less than `uiDllCodeValues.len`
-    // 'cause `WAIT_TIMEOUT` and `WAIT_FAILED` are checked,
-    // and `WAIT_ABANDONED` appears only for mutexes, not for events
-    switch (runtimeUiDllCodeValues[eventIndex]) {
-        @intFromEnum(UiDllCode.Success) => {
-            utils.exit(0);
-        },
-        @intFromEnum(UiDllCode.GetExeDirFail) => {
-            @panic(MainErrors.UI_DLL_GET_EXE_PATH_FAIL);
-        },
-        @intFromEnum(UiDllCode.InitXamlDiagsFail) => {
-            @panic(MainErrors.UI_DLL_INIT_XAML_DIAGS_FAIL);
-        },
-        else => {
-            unreachable;
-        },
+    const eventUiDllCode = runtimeUiDllCodeValues[eventIndex];
+
+    if (eventUiDllCode != UiDllCode.Success) {
+        @panic(UI_DLL_ERRORS[eventUiDllCode]);
     }
 }
