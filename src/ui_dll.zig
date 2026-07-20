@@ -111,7 +111,6 @@ fn initXamlDiags(
 
     // Need to do multiple attempts 'cause when `explorer.exe`
     // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
-
     var attemptCount = 0;
 
     while (attemptCount < 60) : ({
@@ -125,10 +124,14 @@ fn initXamlDiags(
         // Call `InitializeXamlDiagnosticsEx` in another thread
         // 'cause it works only once per thread
 
+        var initXamlDiagsResult: @FieldType(InitXamlDiagsRoutineContext, "result") = undefined;
+
         utils.joinThread(
             utils.createThread(
                 &initXamlDiagsRoutine,
                 InitXamlDiagsRoutineContext{
+                    .result = &initXamlDiagsResult,
+
                     .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
                     .endPointName = diagsName,
                     .pid = currentPid,
@@ -136,6 +139,18 @@ fn initXamlDiags(
                     .tapClsid = TaskbarHook.TASKBAR_HOOK_GUID,
                 },
             ),
+        );
+
+        if (initXamlDiagsResult == win.HRESULT.S_OK) {
+            break;
+        }
+    }
+    if (attemptCount == 60) {
+        _ = utils.setEventOfEnum(
+            UiDllCode.EVENT_NAME_PREFIX,
+            UiDllCode.InitXamlDiagsFailed,
+            UiDllCode.EVENT_DESIRED_ACCESS,
+            win.FALSE,
         );
     }
 
@@ -151,6 +166,9 @@ fn initXamlDiags(
 }
 
 const InitXamlDiagsRoutineContext = struct {
+    /// Pointer to which assign result of `InitializeXamlDiagnosticsEx`.
+    result: *@typeInfo(win.InitializeXamlDiagnosticsEx).@"fn".return_type,
+
     /// Pointer to the `InitializeXamlDiagnosticsEx` function.
     initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
 
@@ -166,7 +184,7 @@ const InitXamlDiagsRoutineContext = struct {
 export fn initXamlDiagsRoutine(
     context: InitXamlDiagsRoutineContext,
 ) callconv(.winapi) @typeInfo(win.InitializeXamlDiagnosticsEx).@"fn".return_type {
-    return context.initializeXamlDiagnosticsEx(
+    context.result.* = context.initializeXamlDiagnosticsEx(
         context.endPointName,
         context.pid,
         null,

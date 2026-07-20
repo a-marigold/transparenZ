@@ -37,6 +37,7 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 pub const UiDllCode = enum(u32) {
     Success,
     GetExeDirFailed,
+    InitXamlDiagsFailed,
 
     /// See `UiDllCode`.
     pub const EVENT_NAME_PREFIX = "Local\\\\tZyC";

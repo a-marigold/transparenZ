@@ -12,7 +12,6 @@ pub const WINDOWS_UI_XAML_DLL_NAME = "Windows.UI.Xaml.dll";
 pub const LPDWORD = *zigWin.DWORD;
 
 pub const BOOL = c_int;
-
 pub const FALSE: BOOL = 0;
 pub const TRUE: BOOL = 1;
 
@@ -28,11 +27,12 @@ pub const PROCESS_VM_WRITE = 0x0020;
 
 pub const MEM_RESERVE = 0x00002000;
 pub const MEM_COMMIT = 0x00001000;
-
 pub const PAGE_READWRITE = 0x04;
 
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
 pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;
+
+pub const INFINITE: zigWin.DWORD = @bitCast(-1);
 
 pub const HRESULT = enum(zigWin.DWORD) {
     S_OK = 0x00000000,
@@ -76,13 +76,10 @@ pub const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
 };
 
 pub const WAIT_OBJECT_0: zigWin.DWORD = 0;
-
 pub const WAIT_TIMEOUT: zigWin.DWORD = 0x00000102;
-
 pub const WAIT_FAILED: zigWin.DWORD = 0xFFFFFFFF;
 
 pub const LOAD_LIBRARY_SEARCH_SYSTEM32: zigWin.DWORD = 0x00000800;
-
 pub const LOAD_LIBRARY_AS_DATAFILE: zigWin.DWORD = 0x00000002;
 
 pub const SYNCHRONIZE: zigWin.DWORD = 0x00100000;
@@ -178,7 +175,7 @@ pub extern "user32" fn FindWindowExW(
 ) callconv(.winapi) ?zigWin.HWND;
 
 pub extern "kernel32" fn CreateEventExW(
-    lpEventAttributes: *zigWin.SECURITY_ATTRIBUTES,
+    lpEventAttributes: ?*zigWin.SECURITY_ATTRIBUTES,
     lpName: zigWin.LPCWSTR,
     dwFlags: zigWin.DWORD,
     dwDesiredAccess: zigWin.DWORD,
@@ -261,6 +258,11 @@ pub extern "kernel32" fn TerminateProcess(
     hProcess: zigWin.HANDLE,
     uExitCode: zigWin.UINT,
 ) callconv(.winapi) BOOL;
+
+pub extern "kernel32" fn WaitForSingleObject(
+    hHandle: zigWin.HANDLE,
+    dwMilliseconds: zigWin.DWORD,
+) callconv(.winapi) zigWin.DWORD;
 
 pub extern "kernel32" fn WaitForMultipleObjects(
     nCount: zigWin.DWORD,
