@@ -87,14 +87,10 @@ pub fn main() void {
         @panic(MainErrors.UI_DLL_CODE_EVENT_CREATION_FAILED);
     };
 
-    _ = win.CreateRemoteThread(
+    _ = utils.createRemoteThread(
         explorerProcess,
-        null,
-        0,
-        @ptrCast(loadLibraryW),
+        loadLibraryW,
         uiDllPathStartAddress,
-        0,
-        null,
     );
 
     const waitResult = win.WaitForMultipleObjects(
@@ -110,18 +106,18 @@ pub fn main() void {
 
     const runtimeUiDllCodeValues = comptime utils.getRuntimeEnumValues(
         UiDllCodeValues,
-
         UiDllCodeInfo.tag_type,
     );
+
+    const eventIndex = waitResult - win.WAIT_OBJECT_0;
 
     // `eventIndex` is exactly less than `runtimeUiDllCodeValues` length:
     // `WAIT_TIMEOUT` cannot appear here, `WAIT_FAILED` is checked,
     // and `WAIT_ABANDONED` appears only for mutexes, not for events
-    const eventIndex = waitResult - win.WAIT_OBJECT_0;
 
     const eventUiDllCode = runtimeUiDllCodeValues[eventIndex];
 
-    if (eventUiDllCode != UiDllCode.Success) {
+    if (eventUiDllCode != @intFromEnum(UiDllCode.Success)) {
         @panic(UI_DLL_ERRORS[eventUiDllCode]);
     }
 }

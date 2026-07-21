@@ -126,15 +126,35 @@ pub fn allocWriteProcessMemory(
     return startAddress;
 }
 
-/// High-level wrapper of `CreateThread` win api.
+/// High-level wrapper over `CreateThread` win api.
 ///
 /// Returns handle to created thread or `null` in case of error.
 pub inline fn createThread(
+    /// Init function.
     startRoutine: *const zigWin.THREAD_START_ROUTINE,
-    /// Passed to `CreateThread` as `lpParameter`.
+    /// `lpParameter` of `CreateThread`.
     routineArg: ?*anyopaque,
 ) ?zigWin.HANDLE {
     return win.CreateThread(
+        null,
+        0,
+        startRoutine,
+        routineArg,
+        0,
+        null,
+    );
+}
+
+/// High-level wrapper over `CreateRemoteThread` win api.
+pub inline fn createRemoteThread(
+    /// Process in which to create thread.
+    process: zigWin.HANDLE,
+    startRoutine: *const zigWin.THREAD_START_ROUTINE,
+    /// `lpParameter` of `CreateRemoteThread`.
+    routineArg: ?*anyopaque,
+) ?zigWin.HANDLE {
+    return win.CreateRemoteThread(
+        process,
         null,
         0,
         startRoutine,
@@ -185,7 +205,7 @@ pub fn createEventsFromEnum(
     /// `field_values` of an `Enum`.
     comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
-    namePrefix: []const u8,
+    comptime namePrefix: []const u8,
     /// To be passed to `CreateEventExW`.
     dwFlags: zigWin.DWORD,
     /// To be passed to `CreateEventExW`.
@@ -212,7 +232,6 @@ pub fn createEventsFromEnum(
 
     return events;
 }
-
 /// Calls `OpenEventW` with name `namePrefix ++ EnumValue`,
 /// calls `SetEvent` with the event and closes it with `CloseHandle`.
 ///
@@ -220,8 +239,8 @@ pub fn createEventsFromEnum(
 ///
 /// Returns result of `SetEvent` call.
 pub inline fn setEventOfEnum(
-    /// mMust be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
-    namePrefix: []const u8,
+    /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    comptime namePrefix: []const u8,
     comptime EnumValue: comptime_int,
     /// To be passed to `OpenEventW`.
     dwDesiredAccess: zigWin.DWORD,
@@ -242,7 +261,7 @@ pub inline fn setEventOfEnum(
 /// Returns `namePrefix ++ EnumValue`.
 fn getEventNameOfEnumValue(
     /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
-    namePrefix: []const u8,
+    comptime namePrefix: []const u8,
     comptime EnumValue: comptime_int,
 ) []const u16 {
     return unicode.utf8ToUtf16LeStringLiteral(namePrefix) ++ constants.UTF16_NUMBERS[EnumValue];
@@ -255,10 +274,11 @@ pub fn getRuntimeEnumValues(
     comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
 ) [EnumValues.len]TagType {
-    var result: [EnumValues.len]TagType = undefined;
+    var runtimeValues: [EnumValues.len]TagType = undefined;
+
     inline for (EnumValues, 0..) |value, index| {
-        result[index] = value;
+        runtimeValues[index] = value;
     }
 
-    return result;
+    return runtimeValues;
 }
