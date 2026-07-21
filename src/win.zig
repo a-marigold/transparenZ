@@ -32,7 +32,7 @@ pub const PAGE_READWRITE = 0x04;
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
 pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;
 
-pub const INFINITE: zigWin.DWORD = @bitCast(-1);
+pub const INFINITE: zigWin.DWORD = @bitCast(@as(i32, -1));
 
 pub const HRESULT = enum(zigWin.DWORD) {
     S_OK = 0x00000000,
@@ -133,7 +133,7 @@ pub const InitializeXamlDiagnosticsEx = fn (
     wszDllXamlDiagnostics: ?zigWin.LPCWSTR,
     wszTAPDllName: zigWin.LPCWSTR,
     tapClsid: *const zigWin.GUID,
-    wszInitializationData: zigWin.LPCWSTR,
+    wszInitializationData: ?zigWin.LPCWSTR,
 ) callconv(.winapi) HRESULT;
 
 pub extern "kernel32" fn LoadLibraryExW(
@@ -157,7 +157,7 @@ pub extern "kernel32" fn WriteFile(
 
 pub extern "kernel32" fn GetCurrentProcess() callconv(.winapi) zigWin.HANDLE;
 
-pub extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) zigWin.HANDLE;
+pub extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) zigWin.DWORD;
 
 pub extern "kernel32" fn OpenProcess(
     dwDesiredAccess: zigWin.DWORD,

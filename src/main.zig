@@ -89,7 +89,7 @@ pub fn main() void {
 
     _ = utils.createRemoteThread(
         explorerProcess,
-        loadLibraryW,
+        @ptrCast(loadLibraryW),
         uiDllPathStartAddress,
     );
 
@@ -109,11 +109,11 @@ pub fn main() void {
         UiDllCodeInfo.tag_type,
     );
 
-    const eventIndex = waitResult - win.WAIT_OBJECT_0;
-
     // `eventIndex` is exactly less than `runtimeUiDllCodeValues` length:
     // `WAIT_TIMEOUT` cannot appear here, `WAIT_FAILED` is checked,
     // and `WAIT_ABANDONED` appears only for mutexes, not for events
+
+    const eventIndex = waitResult - win.WAIT_OBJECT_0;
 
     const eventUiDllCode = runtimeUiDllCodeValues[eventIndex];
 

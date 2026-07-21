@@ -17,7 +17,7 @@ const TaskbarHook = @import("taskbar_hook.zig");
 
 const UiDllCode = constants.UiDllCode;
 
-var taskbarHook = TaskbarHook.taskbarHook;
+var taskbarHook = &TaskbarHook.taskbarHook;
 
 export fn DllMain(
     hinstDLL: zigWin.HINSTANCE,
@@ -49,7 +49,7 @@ export fn DllMain(
 export fn DllGetClassObject(
     rclsid: *const zigWin.GUID,
     riid: *const zigWin.GUID,
-    ppv: *zigWin.LPVOID,
+    ppv: *?zigWin.LPVOID,
 ) callconv(.winapi) win.HRESULT {
     // The check is not actually needed
     // 'cause `DllGetClassObject` is called only by `InitializeXamlDiagnoticsEx`.
@@ -87,7 +87,7 @@ fn initXamlDiags(
         var exeDirPath = utils.getExeDirPath() orelse {
             _ = utils.setEventOfEnum(
                 UiDllCode.EVENT_NAME_PREFIX,
-                UiDllCode.GetExeDirFail,
+                @intFromEnum(UiDllCode.GetExeDirFail),
                 UiDllCode.EVENT_DESIRED_ACCESS,
             );
 
@@ -106,14 +106,14 @@ fn initXamlDiags(
     // Start with 10 to have stable length.
     // If start with 0-9 numbers, there is an unused whitespace
 
-    var diagsName: [5]u16 = "tZy" ++ constants.UTF16_NUMBERS[10];
+    var diagsName: [5:0]u16 = ("tZy" ++ constants.UTF16_NUMBERS[10]).*;
 
     // Need to do multiple attempts 'cause when `explorer.exe`
     // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
 
     const maxAttemptCount = 60;
 
-    var attemptCount = 0;
+    var attemptCount: u32 = 0;
 
     while (attemptCount < maxAttemptCount) : ({
         attemptCount += 1;
@@ -123,35 +123,37 @@ fn initXamlDiags(
         diagsName[diagsName.len - 2] = diagsNameCount[0];
         diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
+        var initXamlDiagsResult: win.HRESULT = undefined;
+
         // Call `InitializeXamlDiagnosticsEx` in another thread
         // 'cause it works only once per thread
 
-        var initXamlDiagsResult: @FieldType(InitXamlDiagsRoutineContext, "result") = undefined;
+        const initXamlDiagsRoutineThread = utils.createThread(
+            @ptrCast(&initXamlDiagsRoutine),
+            @constCast(&InitXamlDiagsRoutineContext{
+                .result = &initXamlDiagsResult,
 
-        utils.joinThread(
-            utils.createThread(
-                &initXamlDiagsRoutine,
-                InitXamlDiagsRoutineContext{
-                    .result = &initXamlDiagsResult,
-
-                    .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
-                    .endPointName = diagsName,
-                    .pid = currentPid,
-                    .wszTAPDllName = uiDllPath,
-                    .tapClsid = TaskbarHook.TASKBAR_HOOK_GUID,
-                },
-            ),
+                .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
+                .endPointName = &diagsName,
+                .pid = currentPid,
+                .wszTAPDllName = &uiDllPath.buffer,
+                .tapClsid = &TaskbarHook.TASKBAR_HOOK_GUID,
+            }),
         );
 
-        if (initXamlDiagsResult == win.HRESULT.S_OK) {
-            break;
+        if (initXamlDiagsRoutineThread) |thread| {
+            utils.joinThread(thread);
+
+            if (initXamlDiagsResult == win.HRESULT.S_OK) {
+                break;
+            }
         }
     }
 
     if (attemptCount == maxAttemptCount) {
         _ = utils.setEventOfEnum(
             UiDllCode.EVENT_NAME_PREFIX,
-            UiDllCode.InitXamlDiagsFail,
+            @intFromEnum(UiDllCode.InitXamlDiagsFail),
             UiDllCode.EVENT_DESIRED_ACCESS,
         );
     }
@@ -159,7 +161,7 @@ fn initXamlDiags(
     // Neccessarily indicate success
     _ = utils.setEventOfEnum(
         UiDllCode.EVENT_NAME_PREFIX,
-        UiDllCode.Success,
+        @intFromEnum(UiDllCode.Success),
         UiDllCode.EVENT_DESIRED_ACCESS,
     );
 
@@ -168,23 +170,23 @@ fn initXamlDiags(
 
 const InitXamlDiagsRoutineContext = struct {
     /// Pointer to which assign result of `InitializeXamlDiagnosticsEx`.
-    result: *@typeInfo(win.InitializeXamlDiagnosticsEx).@"fn".return_type,
+    result: *win.HRESULT,
 
     /// Pointer to the `InitializeXamlDiagnosticsEx` function.
     initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
 
     // `InitializeXamlDiagnosticsEx` parameters.
 
-    endPointName: []const u16,
+    endPointName: [:0]const u16,
     pid: zigWin.DWORD,
-    wszTAPDllName: []const u16,
+    wszTAPDllName: [:0]const u16,
     tapClsid: *const zigWin.GUID,
 };
 
 /// Used as start routine of a thread in `initXamlDiagnostics`.
 export fn initXamlDiagsRoutine(
-    context: InitXamlDiagsRoutineContext,
-) callconv(.winapi) @typeInfo(win.InitializeXamlDiagnosticsEx).@"fn".return_type {
+    context: *InitXamlDiagsRoutineContext,
+) callconv(.winapi) zigWin.DWORD {
     context.result.* = context.initializeXamlDiagnosticsEx(
         context.endPointName,
         context.pid,
@@ -193,4 +195,5 @@ export fn initXamlDiagsRoutine(
         context.tapClsid,
         null,
     );
+    return 1;
 }
