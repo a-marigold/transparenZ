@@ -108,13 +108,13 @@ fn initXamlDiags(
 
     var diagsName: [5:0]u16 = ("tZy" ++ constants.UTF16_NUMBERS[10]).*;
 
-    // Need to do multiple attempts 'cause when `explorer.exe`
-    // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
-
     const maxAttemptCount = 60;
+    const attemptInterval = 600;
 
     var attemptCount: u32 = 0;
 
+    // Need to do multiple attempts 'cause when `explorer.exe`
+    // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
     while (attemptCount < maxAttemptCount) : ({
         attemptCount += 1;
 
@@ -148,6 +148,8 @@ fn initXamlDiags(
                 break;
             }
         }
+
+        win.Sleep(attemptInterval);
     }
 
     if (attemptCount == maxAttemptCount) {

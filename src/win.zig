@@ -270,3 +270,5 @@ pub extern "kernel32" fn WaitForMultipleObjects(
     bWaitAll: BOOL,
     dwMilliseconds: zigWin.DWORD,
 ) callconv(.winapi) zigWin.DWORD;
+
+pub extern "kernel32" fn Sleep(dwMilliseconds: zigWin.DWORD) callconv(.winapi) void;
