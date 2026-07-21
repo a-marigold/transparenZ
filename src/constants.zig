@@ -15,6 +15,7 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 
 //     .AnimationId = 0,
 // };
+
 // pub const TASKBAR_COMPOSITION_ATTRIB_DATA: win.WINDOWCOMPOSITIONATTRIBDATA = .{
 //     .Attrib = .WCA_ACCENT_POLICY,
 //     .pvData = &ACCENT_POLICY,
@@ -24,7 +25,7 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 /// Used to share successfull completion of taskbar styling or an error from `ui.dll` to main process.
 ///
 /// Main process creates events via `CreateEventExW`
-/// with prefix `UiDllCode.EVENT_PREFIX` for every variant of this enumiration.
+/// with prefix `UiDllCode.EVENT_NAME_PREFIX` for every variant of this enumiration.
 ///
 /// When taskbar is succesfully styled or an error appears,
 /// `ui.dll` calls `SetEvent` with corresponding event name.
@@ -34,7 +35,7 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 /// Example of how event names combined:
 ///
 /// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\\\\SomePrefix1"`.
-pub const UiDllCode = enum(u32) {
+pub const UiDllCode = enum(usize) {
     Success,
 
     GetExeDirFail,
@@ -50,10 +51,10 @@ pub const UiDllCode = enum(u32) {
 /// Messages of errors appearing only in the main process.
 pub const MainErrors = struct {
     pub const OPEN_EXPLORER_FAIL = "Failed to open 'explorer.exe' process.";
+
     pub const GET_EXE_PATH_FAIL = "Failed to get path to the 'transparenZ' executable.";
 
     pub const ALLOC_UI_DLL_FILE_NAME_FAIL = "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' string in explorer.exe.";
-
     pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
 
     pub const UI_DLL_CODE_EVENT_CREATION_FAILED = "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
@@ -69,9 +70,9 @@ pub const MainErrors = struct {
 pub const UI_DLL_ERRORS = block: {
     var errors: [@typeInfo(UiDllCode).@"enum".field_values.len][:0]const u8 = undefined;
 
-    errors[UiDllCode.GetExeDirFail] = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+    errors[@intFromEnum(UiDllCode.GetExeDirFail)] = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
 
-    errors[UiDllCode.InitXamlDiagsFail] = "Failed to initialize xaml diagnostics in '" ++ UI_DLL_FILE_NAME ++ "'.";
+    errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] = "Failed to initialize xaml diagnostics in '" ++ UI_DLL_FILE_NAME ++ "'.";
 
     break :block errors;
 };
@@ -81,16 +82,33 @@ pub const UI_DLL_ERRORS = block: {
 /// Used not to convert numbers to UTF-16 in runtime.
 ///
 /// `quantity` is increased on demand.
-/// That is, when a part of application using this array needs more numbers, the array is expanded.
+///
+/// That is, when a part of application using this array needs more numbers, it exapnds the array.
 ///
 /// For example, to convert 16 to UTF-16, use `UTF16_NUMBERS[16]`.
 pub const UTF16_NUMBERS = block: {
-    const quantity = 20;
+    @setEvalBranchQuota(100_000);
 
-    var numbers: [quantity][]const u16 = undefined;
+    const quantity = 16;
+
+    var numbers: [quantity][:0]const u16 = undefined;
+
     var number = 0;
     while (number < quantity) : (number += 1) {
-        numbers[number] = std.fmt.comptimePrint("{d}", .{number});
+        const utf8Number = std.fmt.comptimePrint("{d}", .{number});
+
+        const utf16Number: [utf8Number.len:0]u16 = numberBlock: {
+            var result: [utf8Number.len:0]u16 = undefined;
+
+            _ = std.unicode.utf8ToUtf16Le(&result, utf8Number) catch |err| {
+                @compileError(err);
+            };
+
+            break :numberBlock result;
+        };
+
+        numbers[number] = &utf16Number;
     }
+
     break :block numbers;
 };
