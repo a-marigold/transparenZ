@@ -221,15 +221,14 @@ pub fn createEventsFromEnum(
             dwDesiredAccess,
         );
 
-        if (event == null) {
+        if (event) |eventHandle| {
+            events[index] = eventHandle;
+        } else {
             @branchHint(.cold);
 
             return null;
         }
-
-        events[index] = event;
     }
-
     return events;
 }
 /// Calls `OpenEventW` with name `namePrefix ++ EnumValue`,
@@ -237,7 +236,7 @@ pub fn createEventsFromEnum(
 ///
 /// Uses `getEventNameOfEnumValue` to create names for events.
 ///
-/// Returns result of `SetEvent` call.
+/// Returns result of `SetEvent` call or `FALSE` if opened event is `null`.
 pub inline fn setEventOfEnum(
     /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
     comptime namePrefix: []const u8,
@@ -251,9 +250,15 @@ pub inline fn setEventOfEnum(
         comptime getEventNameOfEnumValue(namePrefix, EnumValue),
     );
 
-    defer _ = win.CloseHandle(event);
+    if (event) |eventHandle| {
+        defer _ = win.CloseHandle(eventHandle);
 
-    return win.SetEvent(event);
+        return win.SetEvent(eventHandle);
+    } else {
+        @branchHint(.cold);
+
+        return win.FALSE;
+    }
 }
 
 /// Intended to be called at comptime.
@@ -263,7 +268,7 @@ fn getEventNameOfEnumValue(
     /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
     comptime namePrefix: []const u8,
     comptime EnumValue: comptime_int,
-) []const u16 {
+) [:0]const u16 {
     return unicode.utf8ToUtf16LeStringLiteral(namePrefix) ++ constants.UTF16_NUMBERS[EnumValue];
 }
 
