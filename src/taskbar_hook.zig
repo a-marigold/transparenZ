@@ -21,8 +21,8 @@ vtable: *const win.IObjectWithSite.VTable,
 /// Pointer to `IXamlDiagnostics`.
 ///
 /// Initialized in `taskbarHook.vtable.SetSite`,
-/// when windows calls this function after executing `DllGetClassObject`.
-iXamlDiagnostics: ?*win.IUnknown,
+/// when the OS calls this function after executing `DllGetClassObject`.
+iXamlDiagnostics: ?*win.IXamlDiagnostics,
 
 /// `AddRef` and `Release` no-op implemenation of `taskbarHook`.
 ///

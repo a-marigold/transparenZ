@@ -18,6 +18,7 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 
 // pub const TASKBAR_COMPOSITION_ATTRIB_DATA: win.WINDOWCOMPOSITIONATTRIBDATA = .{
 //     .Attrib = .WCA_ACCENT_POLICY,
+//
 //     .pvData = &ACCENT_POLICY,
 //     .cbData = @sizeOf(win.ACCENT_POLICY),
 // };
@@ -30,7 +31,7 @@ pub const UI_DLL_FILE_NAME = "ui.dll";
 /// When taskbar is succesfully styled or an error appears,
 /// `ui.dll` calls `SetEvent` with corresponding event name.
 ///
-/// `ui.dll` MUST set `UiDllCode.Success` if it ended successfully.
+/// `ui.dll` **must** set `UiDllCode.Success` if it ended successfully.
 ///
 /// Example of how event names combined:
 ///
@@ -40,6 +41,7 @@ pub const UiDllCode = enum(usize) {
 
     GetExeDirFail,
     InitXamlDiagsFail,
+    VisualTreeServiceFail,
 
     /// See `UiDllCode`.
     pub const EVENT_NAME_PREFIX = "Local\\\\tZyC";
@@ -54,7 +56,7 @@ pub const MainErrors = struct {
 
     pub const GET_EXE_PATH_FAIL = "Failed to get path to the 'transparenZ' executable.";
 
-    pub const ALLOC_UI_DLL_FILE_NAME_FAIL = "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' string in explorer.exe.";
+    pub const ALLOC_UI_DLL_FILE_NAME_FAIL = "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' path string in explorer.exe.";
     pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
 
     pub const UI_DLL_CODE_EVENT_CREATION_FAILED = "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
@@ -72,7 +74,9 @@ pub const UI_DLL_ERRORS = block: {
 
     errors[@intFromEnum(UiDllCode.GetExeDirFail)] = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
 
-    errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] = "Failed to initialize xaml diagnostics in '" ++ UI_DLL_FILE_NAME ++ "'.";
+    errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] = "Failed to initialize XAML diagnostics.";
+
+    errors[@intFromEnum(UiDllCode.VisualTreeServiceFail)] = "Failed to initialize 'IVisualTreeService'.";
 
     break :block errors;
 };

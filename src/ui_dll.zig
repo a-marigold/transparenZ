@@ -88,7 +88,7 @@ fn initXamlDiags(
         var exeDirPath = utils.getExeDirPath() orelse {
             setUiDllCodeEvent(UiDllCode.GetExeDirFail);
 
-            return 0;
+            return 1;
         };
 
         utils.exeDirPathToUiDllPath(&exeDirPath);
@@ -162,7 +162,9 @@ fn initXamlDiags(
         if (queryVisualTreeServiceResult != .S_OK) {
             @branchHint(.cold);
 
-            return 0;
+            setUiDllCodeEvent(UiDllCode.VisualTreeServiceFail);
+
+            return 1;
         }
 
         visualTreeService.vtable.AdviseVisualTreeChange(
@@ -176,7 +178,7 @@ fn initXamlDiags(
     // Neccessarily indicate success
     setUiDllCodeEvent(UiDllCode.Success);
 
-    return 1;
+    return 0;
 }
 
 const InitXamlDiagsRoutineContext = struct {
