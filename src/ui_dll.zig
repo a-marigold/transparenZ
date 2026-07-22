@@ -31,6 +31,7 @@ export fn DllMain(
 
         // New thread is used 'cause `initXamlDiags`
         // loads libraries and can cause loader lock
+
         const thread = utils.createThread(&initXamlDiags, null);
 
         if (thread) |handle| {
@@ -85,11 +86,7 @@ fn initXamlDiags(
 
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
-            _ = utils.setEventOfEnum(
-                UiDllCode.EVENT_NAME_PREFIX,
-                @intFromEnum(UiDllCode.GetExeDirFail),
-                UiDllCode.EVENT_DESIRED_ACCESS,
-            );
+            setUiDllCodeEvent(UiDllCode.GetExeDirFail);
 
             return 0;
         };
@@ -115,11 +112,11 @@ fn initXamlDiags(
 
     // Need to do multiple attempts 'cause when `explorer.exe`
     // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
+
     while (attemptCount < maxAttemptCount) : ({
         attemptCount += 1;
 
         const diagsNameCount = constants.UTF16_NUMBERS[attemptCount + 10];
-
         diagsName[diagsName.len - 2] = diagsNameCount[0];
         diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
@@ -130,6 +127,7 @@ fn initXamlDiags(
 
         const initXamlDiagsRoutineThread = utils.createThread(
             @ptrCast(&initXamlDiagsRoutine),
+
             @constCast(&InitXamlDiagsRoutineContext{
                 .result = &initXamlDiagsResult,
 
@@ -172,19 +170,11 @@ fn initXamlDiags(
             &null,
         );
     } else {
-        _ = utils.setEventOfEnum(
-            UiDllCode.EVENT_NAME_PREFIX,
-            @intFromEnum(UiDllCode.InitXamlDiagsFail),
-            UiDllCode.EVENT_DESIRED_ACCESS,
-        );
+        setUiDllCodeEvent(UiDllCode.InitXamlDiagsFail);
     }
 
     // Neccessarily indicate success
-    _ = utils.setEventOfEnum(
-        UiDllCode.EVENT_NAME_PREFIX,
-        @intFromEnum(UiDllCode.Success),
-        UiDllCode.EVENT_DESIRED_ACCESS,
-    );
+    setUiDllCodeEvent(UiDllCode.Success);
 
     return 1;
 }
@@ -196,7 +186,7 @@ const InitXamlDiagsRoutineContext = struct {
     /// Pointer to the `InitializeXamlDiagnosticsEx` function.
     initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
 
-    // `InitializeXamlDiagnosticsEx` parameters.
+    // `InitializeXamlDiagnosticsEx` parameters
 
     endPointName: [:0]const u16,
     pid: zigWin.DWORD,
@@ -205,7 +195,7 @@ const InitXamlDiagsRoutineContext = struct {
 };
 
 /// Used as start routine of a thread in `initXamlDiagnostics`.
-export fn initXamlDiagsRoutine(
+fn initXamlDiagsRoutine(
     context: *InitXamlDiagsRoutineContext,
 ) callconv(.winapi) zigWin.DWORD {
     context.result.* = context.initializeXamlDiagnosticsEx(
@@ -216,5 +206,14 @@ export fn initXamlDiagsRoutine(
         context.tapClsid,
         null,
     );
+
     return 1;
+}
+
+inline fn setUiDllCodeEvent(code: UiDllCode) void {
+    _ = utils.setEventOfEnum(
+        UiDllCode.EVENT_NAME_PREFIX,
+        code,
+        UiDllCode.EVENT_DESIRED_ACCESS,
+    );
 }
