@@ -152,7 +152,26 @@ fn initXamlDiags(
         win.Sleep(attemptInterval);
     }
 
-    if (attemptCount == maxAttemptCount) {
+    if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
+        var visualTreeService: *win.IVisualTreeService = undefined;
+
+        const queryVisualTreeServiceResult = iXamlDiagnostics.vtable.QueryInterface(
+            iXamlDiagnostics,
+            win.IID_IVisualTreeService,
+            &visualTreeService,
+        );
+
+        if (queryVisualTreeServiceResult != .S_OK) {
+            @branchHint(.cold);
+
+            return 0;
+        }
+
+        visualTreeService.vtable.AdviseVisualTreeChange(
+            visualTreeService,
+            &null,
+        );
+    } else {
         _ = utils.setEventOfEnum(
             UiDllCode.EVENT_NAME_PREFIX,
             @intFromEnum(UiDllCode.InitXamlDiagsFail),

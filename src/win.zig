@@ -88,11 +88,6 @@ pub const EVENT_MODIFY_STATE: zigWin.DWORD = 0x0002;
 pub const IUnknown = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
-        // Opaque pointers 'cause this type is used
-        // for imitation of cpp inheritance.
-        // If replace opaques with `IUnknown`,
-        // there are type errors in inherited objects
-
         QueryInterface: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) HRESULT,
         AddRef: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
         Release: *const fn (self: *anyopaque) callconv(.winapi) zigWin.ULONG,
@@ -109,10 +104,6 @@ pub const IID_IObjectWithSite = zigWin.GUID{
 pub const IObjectWithSite = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
-        // Opaque pointers 'cause this type is used
-        // for imitation of cpp inheritance.
-        // If replace opaques with `IObjectWithSite`,
-        // there are type errors in inherited objects
         QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
         AddRef: @FieldType(IUnknown.VTable, "AddRef"),
         Release: @FieldType(IUnknown.VTable, "Release"),
@@ -120,11 +111,88 @@ pub const IObjectWithSite = extern struct {
         GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
     };
 };
+
+pub const IXamlDiagnostics = extern struct {
+    vtable: *const VTable,
+    pub const VTable = extern struct {
+        QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
+        AddRef: @FieldType(IUnknown.VTable, "AddRef"),
+        Release: @FieldType(IUnknown.VTable, "Release"),
+        GetApplication: *anyopaque,
+        GetDispatcher: *anyopaque,
+        GetHandleFromIInspectable: *anyopaque,
+        GetIInspectableFromHandle: *anyopaque,
+        GetInitializationData: *anyopaque,
+        GetUiLayer: *anyopaque,
+        HitTest: *anyopaque,
+        RegisterInstance: *anyopaque,
+    };
+};
+
 pub const IID_IXamlDiagnostics = zigWin.GUID{
     .Data1 = 0x18c9e2b6,
     .Data2 = 0x3c43,
     .Data3 = 0x4116,
     .Data4 = [_]u8{ 0x9f, 0x87, 0xb1, 0x50, 0x6a, 0x61, 0x72, 0xe8 },
+};
+
+pub const IVisualTreeService = extern struct {
+    vtable: *const VTable,
+    pub const VTable = extern struct {
+        QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
+        AddRef: @FieldType(IUnknown.VTable, "AddRef"),
+        Release: @FieldType(IUnknown.VTable, "Release"),
+        AddChild: *anyopaque,
+        AdviseVisualTreeChange: *const fn (
+            self: *anyopaque,
+            pCallback: *IVisualTreeServiceCallback,
+        ) callconv(.winapi) HRESULT,
+        ClearChildren: *anyopaque,
+        ClearProperty: *anyopaque,
+        CreateInstance: *anyopaque,
+        GetCollectionCount: *anyopaque,
+        GetCollectionElements: *anyopaque,
+        GetEnums: *anyopaque,
+        GetPropertyValuesChain: *anyopaque,
+        RemoveChild: *anyopaque,
+        SetProperty: *anyopaque,
+        UnadviseVisualTreeChange: *anyopaque,
+    };
+};
+
+pub const IID_IVisualTreeService: zigWin.GUID = .{
+    .Data1 = 0xA59316B2,
+    .Data2 = 0xD610,
+    .Data3 = 0x469B,
+    .Data4 = .{ 0xA1, 0x11, 0x71, 0xB8, 0x10, 0x23, 0x50, 0xE0 },
+};
+
+pub const IVisualTreeServiceCallback = extern struct {
+    vtable: *const VTable,
+    pub const VTable = extern struct {
+        QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
+        AddRef: @FieldType(IUnknown.VTable, "AddRef"),
+        Release: @FieldType(IUnknown.VTable, "Release"),
+        OnVisualTreeChange: *const fn (
+            self: *anyopaque,
+            relation: *anyopaque,
+            element: VisualElement,
+            mutationType: VisualMutationType,
+        ) callconv(.winapi) HRESULT,
+    };
+};
+
+pub const VisualElement = extern struct {
+    Handle: zigWin.InstanceHandle,
+    SrcInfo: zigWin.SourceInfo,
+    Type: zigWin.BSTR,
+    Name: zigWin.BSTR,
+    NumChildren: zigWin.UINT,
+};
+
+pub const VisualMutationType = enum(c_int) {
+    Add = 0,
+    Remove,
 };
 
 pub const InitializeXamlDiagnosticsEx = fn (
