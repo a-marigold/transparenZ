@@ -13,7 +13,7 @@ const TARGETS = [_]std.Target.Query{
         .os_tag = .windows,
     },
 };
-pub fn build(b: *const Build) void {
+pub fn build(b: *Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     const release = b.option(
@@ -24,27 +24,31 @@ pub fn build(b: *const Build) void {
         \\ - compression to 'tar.gz'.
         \\ Flag '-Doptimize' still defines optimization level.
         ,
-    );
+    ) orelse false;
 
     if (release) {
         inline for (TARGETS) |target| {
-            buildTransparenZ(b, b.resolveTargetQuery(target), optimize, true);
+            try buildTransparenZ(b, b.resolveTargetQuery(target), optimize, true);
         }
     } else {
-        const target = b.standardTargetOptions(.{});
-        buildTransparenZ(b, b.resolveTargetQuery(target), optimize, false);
+        try buildTransparenZ(b, b.standardTargetOptions(.{}), optimize, false);
     }
 }
 
 fn buildTransparenZ(
-    b: *const std.Build,
+    b: *std.Build,
     target: Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     /// Whether to enable release logic.
     release: bool,
-) void {
+) !void {
     const allocator = b.allocator;
     const installStep = b.getInstallStep();
+
+    // const win32DepModule = b.dependency("win32", .{
+    //     .target = target,
+    //     .optimize = optimize,
+    // }).module("win32");
 
     const exe = b.addExecutable(.{
         .name = "transparenZ",
@@ -56,25 +60,30 @@ fn buildTransparenZ(
             .strip = release,
             .error_tracing = !release,
             .omit_frame_pointer = release,
-            .unwind_tables = !release,
-            .stack_check = !release,
+            .unwind_tables = if (release) .none else null,
         }),
     });
+
+    // exe.root_module.addImport("win32", win32DepModule);
+
     b.installArtifact(exe);
 
     const uiDll = b.addLibrary(.{
         .name = constants.UI_DLL_FILE_NAME,
         .root_module = b.createModule(.{
+            .root_source_file = b.path("src/ui_dll.zig"),
             .target = target,
-            .optimize = .optimize,
+            .optimize = optimize,
             .strip = true,
             .error_tracing = !release,
             .omit_frame_pointer = release,
-            .unwind_tables = !release,
-            .stack_check = !release,
+            .unwind_tables = if (release) .none else null,
         }),
         .linkage = .dynamic,
     });
+
+    // exe.root_module.addImport("win32", win32DepModule);
+
     b.installArtifact(uiDll);
 
     if (release) {
@@ -83,13 +92,14 @@ fn buildTransparenZ(
             "-caf",
             try std.fmt.allocPrint(
                 allocator,
-                "transparenZ-{}",
+                "transparenZ-{s}",
                 .{try target.query.zigTriple(allocator)},
             ),
             "-C",
             "zig-out",
             ".",
         });
+
         runTar.step.dependOn(installStep);
     }
 }
