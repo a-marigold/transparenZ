@@ -1,4 +1,4 @@
-### <p align='center'> transparenZ </p>
+# <img src="./.github/assets/logo.svg" align="center" alt="transparenZ logo" width="216">
 
 Utility that makes windows 11 taskbar transparent.
 
