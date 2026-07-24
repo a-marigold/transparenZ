@@ -1,22 +1,23 @@
 //! Definitions of `win32` types used in `transparenZ`.
 //!
 //! Contains only types that are missing in `std.os.windows`.
+//!
+//! ### This module is going to be deprecated (see `TODO` section in `README.md`).
 
 pub const zigWin = @import("std").os.windows;
 
-/// The windows class name of task bar.
-pub const TASK_BAR_CLASS_NAME = "Shell_TrayWnd";
-
-pub const WINDOWS_UI_XAML_DLL_NAME = "Windows.UI.Xaml.dll";
+// TODO: add no-ops for IUnknown
 
 pub const LPDWORD = *zigWin.DWORD;
 
 pub const BOOL = c_int;
+
 pub const FALSE: BOOL = 0;
 pub const TRUE: BOOL = 1;
 
-pub const WPARAM = zigWin.UINT;
+pub const INFINITE: zigWin.DWORD = @bitCast(@as(i32, -1));
 
+pub const WPARAM = zigWin.UINT;
 pub const LPARAM = WPARAM;
 
 pub const STD_ERROR_HANDLE: zigWin.DWORD = @bitCast(@as(i32, -12));
@@ -31,8 +32,6 @@ pub const PAGE_READWRITE = 0x04;
 
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
 pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;
-
-pub const INFINITE: zigWin.DWORD = @bitCast(@as(i32, -1));
 
 pub const HRESULT = enum(zigWin.DWORD) {
     S_OK = 0x00000000,
@@ -49,32 +48,6 @@ pub const HRESULT = enum(zigWin.DWORD) {
     CLASS_E_CLASSNOTAVAILABLE = 0x80040111,
 };
 
-pub const ACCENT_STATE = enum(i32) {
-    ACCENT_DISABLED = 0,
-    ACCENT_ENABLE_GRADIENT = 1,
-    ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
-    ACCENT_ENABLE_BLURBEHIND = 3,
-    ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,
-    ACCENT_INVALID_STATE = 5,
-};
-
-pub const ACCENT_POLICY = extern struct {
-    AccentState: ACCENT_STATE,
-    AccentFlags: i32,
-    GradientColor: i32,
-    AnimationId: i32,
-};
-
-pub const WINDOW_COMPOSITION_ATTRIB = enum(i32) {
-    WCA_ACCENT_POLICY = 19,
-};
-
-pub const WINDOWCOMPOSITIONATTRIBDATA = extern struct {
-    Attrib: WINDOW_COMPOSITION_ATTRIB,
-    pvData: *const anyopaque,
-    cbData: u32,
-};
-
 pub const WAIT_OBJECT_0: zigWin.DWORD = 0;
 pub const WAIT_TIMEOUT: zigWin.DWORD = 0x00000102;
 pub const WAIT_FAILED: zigWin.DWORD = 0xFFFFFFFF;
@@ -84,6 +57,8 @@ pub const LOAD_LIBRARY_AS_DATAFILE: zigWin.DWORD = 0x00000002;
 
 pub const SYNCHRONIZE: zigWin.DWORD = 0x00100000;
 pub const EVENT_MODIFY_STATE: zigWin.DWORD = 0x0002;
+
+pub const InstanceHandle = u32;
 
 pub const IUnknown = extern struct {
     vtable: *const VTable,
@@ -112,28 +87,50 @@ pub const IObjectWithSite = extern struct {
     };
 };
 
+pub const IInspectable = extern struct {
+    vtable: *const VTable,
+    pub const VTable = extern struct {
+        QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
+        AddRef: @FieldType(IUnknown.VTable, "AddRef"),
+        Release: @FieldType(IUnknown.VTable, "Release"),
+        GetIids: *anyopaque,
+        GetRuntimeClassName: *anyopaque,
+        GetTrustLevel: *anyopaque,
+    };
+};
 pub const IXamlDiagnostics = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
         QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
         AddRef: @FieldType(IUnknown.VTable, "AddRef"),
         Release: @FieldType(IUnknown.VTable, "Release"),
-        GetApplication: *anyopaque,
-        GetDispatcher: *anyopaque,
-        GetHandleFromIInspectable: *anyopaque,
-        GetIInspectableFromHandle: *anyopaque,
-        GetInitializationData: *anyopaque,
         GetUiLayer: *anyopaque,
+        GetApplication: *anyopaque,
+        GetIInspectableFromHandle: *const fn (instanceHandle: InstanceHandle, ppInstance: **IInspectable) callconv(.winapi) HRESULT,
+        GetHandleFromIInspectable: *anyopaque,
         HitTest: *anyopaque,
         RegisterInstance: *anyopaque,
+        GetInitializationData: *anyopaque,
     };
 };
-
 pub const IID_IXamlDiagnostics = zigWin.GUID{
     .Data1 = 0x18c9e2b6,
     .Data2 = 0x3c43,
     .Data3 = 0x4116,
-    .Data4 = [_]u8{ 0x9f, 0x87, 0xb1, 0x50, 0x6a, 0x61, 0x72, 0xe8 },
+    .Data4 = .{ 0x9f, 0x2b, 0xff, 0x93, 0x5d, 0x77, 0x70, 0xd2 },
+};
+
+pub const VisualElement = extern struct {
+    Handle: InstanceHandle,
+    SrcInfo: opaque {},
+    Type: zigWin.BSTR,
+    Name: zigWin.BSTR,
+    NumChildren: zigWin.UINT,
+};
+
+pub const VisualMutationType = enum(c_int) {
+    Add = 0,
+    Remove,
 };
 
 pub const IVisualTreeService = extern struct {
@@ -142,29 +139,26 @@ pub const IVisualTreeService = extern struct {
         QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
         AddRef: @FieldType(IUnknown.VTable, "AddRef"),
         Release: @FieldType(IUnknown.VTable, "Release"),
-        AddChild: *anyopaque,
-        AdviseVisualTreeChange: *const fn (
-            self: *anyopaque,
-            pCallback: *IVisualTreeServiceCallback,
-        ) callconv(.winapi) HRESULT,
-        ClearChildren: *anyopaque,
-        ClearProperty: *anyopaque,
+        AdviseVisualTreeChange: *const fn (self: *anyopaque, pCallback: *IVisualTreeServiceCallback) callconv(.winapi) HRESULT,
+        UnadviseVisualTreeChange: *anyopaque,
+        GetEnums: *anyopaque,
         CreateInstance: *anyopaque,
+        GetPropertyValuesChain: *anyopaque,
+        SetProperty: *anyopaque,
+        ClearProperty: *anyopaque,
         GetCollectionCount: *anyopaque,
         GetCollectionElements: *anyopaque,
-        GetEnums: *anyopaque,
-        GetPropertyValuesChain: *anyopaque,
+        AddChild: *anyopaque,
         RemoveChild: *anyopaque,
-        SetProperty: *anyopaque,
-        UnadviseVisualTreeChange: *anyopaque,
+        ClearChildren: *anyopaque,
     };
 };
 
 pub const IID_IVisualTreeService: zigWin.GUID = .{
-    .Data1 = 0xA59316B2,
-    .Data2 = 0xD610,
-    .Data3 = 0x469B,
-    .Data4 = .{ 0xA1, 0x11, 0x71, 0xB8, 0x10, 0x23, 0x50, 0xE0 },
+    .Data1 = 0xA593B11A,
+    .Data2 = 0xD17F,
+    .Data3 = 0x48BB,
+    .Data4 = .{ 0x8F, 0x66, 0x83, 0x91, 0x07, 0x31, 0xC8, 0xA5 },
 };
 
 pub const IVisualTreeServiceCallback = extern struct {
@@ -182,18 +176,67 @@ pub const IVisualTreeServiceCallback = extern struct {
     };
 };
 
-pub const VisualElement = extern struct {
-    Handle: zigWin.InstanceHandle,
-    SrcInfo: zigWin.SourceInfo,
-    Type: zigWin.BSTR,
-    Name: zigWin.BSTR,
-    NumChildren: zigWin.UINT,
+const IShape = struct {
+    vtable: *const VTable,
+    pub const VTable = struct {
+        QueryInterface: @FieldType(IInspectable.VTable, "QueryInterface"),
+        AddRef: @FieldType(IInspectable.VTable, "AddRef"),
+        Release: @FieldType(IInspectable.VTable, "Release"),
+        GetIids: @FieldType(IInspectable.VTable, "GetIids"),
+        GetRuntimeClassName: @FieldType(IInspectable.VTable, "GetRuntimeClassName"),
+        GetTrustLevel: @FieldType(IInspectable.VTable, "GetTrustLevel"),
+        get_Fill: *const fn (**anyopaque) callconv(.winapi) i32,
+        put_Fill: *const fn (*anyopaque) callconv(.winapi) i32,
+        get_Stroke: *const fn (**anyopaque) callconv(.winapi) i32,
+        put_Stroke: *const fn (*anyopaque) callconv(.winapi) i32,
+        get_StrokeMiterLimit: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_StrokeMiterLimit: *const fn (anyopaque) callconv(.winapi) i32,
+        get_StrokeThickness: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_StrokeThickness: *const fn (anyopaque) callconv(.winapi) i32,
+        get_StrokeStartLineCap: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_StrokeStartLineCap: *const fn (anyopaque) callconv(.winapi) i32,
+        get_StrokeEndLineCap: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_StrokeEndLineCap: *const fn (anyopaque) callconv(.winapi) i32,
+        get_StrokeLineJoin: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_StrokeLineJoin: *const fn (anyopaque) callconv(.winapi) i32,
+        get_StrokeDashOffset: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_StrokeDashOffset: *const fn (anyopaque) callconv(.winapi) i32,
+        get_StrokeDashCap: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_StrokeDashCap: *const fn (anyopaque) callconv(.winapi) i32,
+        get_StrokeDashArray: *const fn (**anyopaque) callconv(.winapi) i32,
+        put_StrokeDashArray: *const fn (*anyopaque) callconv(.winapi) i32,
+        get_Stretch: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_Stretch: *const fn (anyopaque) callconv(.winapi) i32,
+        get_GeometryTransform: *const fn (**anyopaque) callconv(.winapi) i32,
+    };
 };
 
-pub const VisualMutationType = enum(c_int) {
-    Add = 0,
-    Remove,
+const IID_IShape: zigWin.GUID = .{
+    .Data1 = 0x786F2B75,
+    .Data2 = 0x9AA0,
+    .Data3 = 0x454D,
+    .Data4 = .{ 0xAE, 0x06, 0xA2, 0x46, 0x6E, 0x37, 0xC8, 0x32 },
 };
+// const ISolidColorBrush = struct {
+//     vtable: *const VTable,
+//     pub const VTable = struct {
+//         QueryInterface: @FieldType(IInspectable.VTable, "QueryInterface"),
+//         AddRef: @FieldType(IInspectable.VTable, "AddRef"),
+//         Release: @FieldType(IInspectable.VTable, "Release"),
+//         GetIids: @FieldType(IInspectable.VTable, "GetIids"),
+//         GetRuntimeClassName: @FieldType(IInspectable.VTable, "GetRuntimeClassName"),
+//         GetTrustLevel: @FieldType(IInspectable.VTable, "GetTrustLevel"),
+//         get_Color: *const fn (*struct_Windows_UI_Color) callconv(.winapi) i32,
+//         put_Color: *const fn (struct_Windows_UI_Color) callconv(.winapi) i32,
+//     };
+// };
+
+// const struct_Windows_UI_Color = extern struct {
+//     a: u8,
+//     r: u8,
+//     g: u8,
+//     b: u8,
+// };
 
 pub const InitializeXamlDiagnosticsEx = fn (
     endPointName: zigWin.LPCWSTR,
@@ -209,11 +252,6 @@ pub extern "kernel32" fn LoadLibraryExW(
     hFile: ?zigWin.HANDLE,
     dwFlags: zigWin.DWORD,
 ) callconv(.winapi) zigWin.HMODULE;
-
-pub extern "user32" fn SetWindowCompositionAttribute(
-    hwnd: zigWin.HWND,
-    pAttrData: *const WINDOWCOMPOSITIONATTRIBDATA,
-) callconv(.winapi) BOOL;
 
 pub extern "kernel32" fn WriteFile(
     hFile: zigWin.HANDLE,
@@ -288,7 +326,6 @@ pub extern "kernel32" fn CreateThread(
     dwCreationFlags: zigWin.DWORD,
     lpThreadId: ?LPDWORD,
 ) callconv(.winapi) ?zigWin.HANDLE;
-
 pub extern "kernel32" fn CreateRemoteThread(
     hProcess: zigWin.HANDLE,
     lpThreadAttributes: ?*zigWin.SECURITY_ATTRIBUTES,
