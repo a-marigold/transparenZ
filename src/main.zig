@@ -35,8 +35,7 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
 
 pub fn main() void {
     const explorerProcess = utils.findProcessByWindowClass(
-        unicode.utf8ToUtf16LeStringLiteral(win.TASK_BAR_CLASS_NAME),
-
+        unicode.utf8ToUtf16LeStringLiteral(constants.TASKBAR_CLASS_NAME),
         win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE | win.PROCESS_CREATE_THREAD,
     ) orelse {
         @branchHint(.cold);
@@ -93,29 +92,15 @@ pub fn main() void {
         uiDllPathStartAddress,
     );
 
-    const waitResult = win.WaitForMultipleObjects(
-        uiDllCodeEvents.len,
-        &uiDllCodeEvents,
-        win.FALSE,
-        win.INFINITE,
-    );
-
-    if (waitResult == win.WAIT_FAILED) {
-        @panic(MainErrors.WAIT_UI_DLL_FAIL);
-    }
-
-    const runtimeUiDllCodeValues = comptime utils.getRuntimeEnumValues(
-        UiDllCodeValues,
+    const eventUiDllCode = utils.waitAnyEventOfEnum(
         UiDllCodeInfo.tag_type,
-    );
-
-    // `eventIndex` is exactly less than `runtimeUiDllCodeValues` length:
-    // `WAIT_TIMEOUT` cannot appear here, `WAIT_FAILED` is checked,
-    // and `WAIT_ABANDONED` appears only for mutexes, not for events
-
-    const eventIndex = waitResult - win.WAIT_OBJECT_0;
-
-    const eventUiDllCode = runtimeUiDllCodeValues[eventIndex];
+        UiDllCodeValues.len,
+        &uiDllCodeEvents,
+        &comptime utils.getRuntimeEnumValues(UiDllCodeValues, UiDllCodeInfo.tag_type),
+        win.INFINITE,
+    ) catch {
+        @panic(MainErrors.WAIT_UI_DLL_FAIL);
+    };
 
     if (eventUiDllCode != @intFromEnum(UiDllCode.Success)) {
         @panic(UI_DLL_ERRORS[eventUiDllCode]);
