@@ -231,12 +231,13 @@ pub fn createEventsFromEnum(
     }
     return events;
 }
+
 /// Calls `OpenEventW` with name `namePrefix ++ EnumValue`,
 /// calls `SetEvent` with the event and closes it with `CloseHandle`.
 ///
 /// Uses `getEventNameOfEnumValue` to create names for events.
 ///
-/// Returns result of `SetEvent` call or `FALSE` if opened event is `null`.
+/// Returns `win.BOOL` indicating success or fail.
 pub inline fn setEventOfEnum(
     /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
     comptime namePrefix: []const u8,
@@ -261,6 +262,40 @@ pub inline fn setEventOfEnum(
     }
 }
 
+const WaitEventOfEnumError = error{
+    WaitFail,
+    WaitTimeout,
+};
+
+/// Waits for `events` via `WaitForMultipleObjects`.
+///
+/// Returns value of enum, event of which `WaitForMultipleObjects` returned or `WaitEventOfEnumError`.
+pub inline fn waitAnyEventOfEnum(
+    comptime enumValuesLen: u64,
+    /// Events from `createEventsFromEnum` function.
+    events: [enumValuesLen]zigWin.HANDLE,
+    /// Runtime enum values from `getRuntimeEnumValues` function.
+    enumValues: [enumValuesLen]comptime_int,
+    /// Time in milliseconds
+    timeoutMs: u32,
+) WaitEventOfEnumError!comptime_int {
+    const waitResult = win.WaitForMultipleObjects(events.len, events, win.FALSE, timeoutMs);
+
+    if (waitResult == win.WAIT_FAILED) {
+        @branchHint(.cold);
+
+        return WaitEventOfEnumError.WaitFail;
+    } else if (waitResult == win.WAIT_TIMEOUT) {
+        @branchHint(.cold);
+
+        return WaitEventOfEnumError.WaitTimeout;
+    }
+
+    const eventIndex = waitResult - win.WAIT_OBJECT_0;
+
+    return enumValues[eventIndex];
+}
+
 /// Intended to be called at comptime.
 ///
 /// Returns `namePrefix ++ EnumValue`.
@@ -274,7 +309,7 @@ fn getEventNameOfEnumValue(
 
 /// Intended to be called at comptime.
 ///
-/// Converts comptime `enumValues` to runtime array with `tagType` elements type.
+/// Converts comptime `EnumValues` to runtime array with `TagType` elements type.
 pub fn getRuntimeEnumValues(
     comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
     comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
@@ -284,6 +319,5 @@ pub fn getRuntimeEnumValues(
     inline for (EnumValues, 0..) |value, index| {
         runtimeValues[index] = value;
     }
-
     return runtimeValues;
 }
