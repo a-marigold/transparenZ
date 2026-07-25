@@ -13,9 +13,11 @@ const constants = @import("constants.zig");
 
 const utils = @import("utils.zig");
 
-const TaskbarHook = @import("taskbar_hook.zig");
-
 const UiDllCode = constants.UiDllCode;
+
+const TaskbarElementNames = constants.TaskbarElementNames;
+
+const TaskbarHook = @import("taskbar_hook.zig");
 
 var taskbarHook = &TaskbarHook.taskbarHook;
 
@@ -31,7 +33,6 @@ export fn DllMain(
 
         // New thread is used 'cause `initXamlDiags`
         // loads libraries and can cause loader lock
-
         const thread = utils.createThread(&initXamlDiags, null);
 
         if (thread) |handle| {
@@ -74,7 +75,7 @@ fn initXamlDiags(
     _ = lpParameter;
 
     const winUiXamlDll = win.LoadLibraryExW(
-        unicode.utf8ToUtf16LeStringLiteral(win.WINDOWS_UI_XAML_DLL_NAME),
+        unicode.utf8ToUtf16LeStringLiteral(constants.WINDOWS_UI_XAML_DLL_NAME),
         null,
         win.LOAD_LIBRARY_SEARCH_SYSTEM32,
     );
@@ -86,7 +87,7 @@ fn initXamlDiags(
 
     const uiDllPath = block: {
         var exeDirPath = utils.getExeDirPath() orelse {
-            setUiDllCodeEvent(UiDllCode.GetExeDirFail);
+            setUiDllCodeEvent(.GetExeDirFail);
 
             return 1;
         };
@@ -112,7 +113,6 @@ fn initXamlDiags(
 
     // Need to do multiple attempts 'cause when `explorer.exe`
     // is loading (e.g the system has just waken up), it can block `InitializeXamlDiagnosticsEx`
-
     while (attemptCount < maxAttemptCount) : ({
         attemptCount += 1;
 
@@ -151,32 +151,20 @@ fn initXamlDiags(
     }
 
     if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
-        var visualTreeService: *win.IVisualTreeService = undefined;
-
-        const queryVisualTreeServiceResult = iXamlDiagnostics.vtable.QueryInterface(
+        const registerCallbackResult = registerVisualTreeServiceCallback(
             iXamlDiagnostics,
-            win.IID_IVisualTreeService,
-            &visualTreeService,
+            .{},
         );
 
-        if (queryVisualTreeServiceResult != .S_OK) {
-            @branchHint(.cold);
-
-            setUiDllCodeEvent(UiDllCode.VisualTreeServiceFail);
-
-            return 1;
+        if (registerCallbackResult != .S_OK) {
+            setUiDllCodeEvent(.InitVisualTreeServiceFail);
         }
-
-        visualTreeService.vtable.AdviseVisualTreeChange(
-            visualTreeService,
-            &null,
-        );
     } else {
-        setUiDllCodeEvent(UiDllCode.InitXamlDiagsFail);
+        setUiDllCodeEvent(.InitXamlDiagsFail);
     }
 
     // Neccessarily indicate success
-    setUiDllCodeEvent(UiDllCode.Success);
+    setUiDllCodeEvent(.Success);
 
     return 0;
 }
@@ -209,13 +197,36 @@ fn initXamlDiagsRoutine(
         null,
     );
 
-    return 1;
+    return 0;
+}
+
+/// Queries `IVisualTreeService` from `iXamlDiagnostics` and then registers `callback` via `AdviseVisualTreeChange`.
+///
+/// Returns result of `AdviseVisualTreeChange` or `HRESULT.E_FAIL` if querying `IVisualTreeService` failed.
+fn registerVisualTreeServiceCallback(
+    iXamlDiagnostics: *win.IXamlDiagnostics,
+    callback: *win.IVisualTreeServiceCallback,
+) win.HRESULT {
+    var iVisualTreeService: ?*win.IVisualTreeService = null;
+
+    _ = iXamlDiagnostics.vtable.QueryInterface(
+        iXamlDiagnostics,
+        &win.IID_IVisualTreeService,
+
+        @ptrCast(&iVisualTreeService),
+    );
+
+    if (iVisualTreeService) |treeService| {
+        return treeService.vtable.AdviseVisualTreeChange(treeService, callback);
+    }
+
+    return .E_FAIL;
 }
 
 inline fn setUiDllCodeEvent(code: UiDllCode) void {
     _ = utils.setEventOfEnum(
         UiDllCode.EVENT_NAME_PREFIX,
-        code,
+        @intFromEnum(code),
         UiDllCode.EVENT_DESIRED_ACCESS,
     );
 }
