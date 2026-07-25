@@ -237,7 +237,7 @@ pub fn createEventsFromEnum(
 ///
 /// Uses `getEventNameOfEnumValue` to create names for events.
 ///
-/// Returns `win.BOOL` indicating success or fail.
+/// Returns `BOOL` indicating success or fail.
 pub inline fn setEventOfEnum(
     /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
     comptime namePrefix: []const u8,
@@ -271,14 +271,15 @@ const WaitEventOfEnumError = error{
 ///
 /// Returns value of enum, event of which `WaitForMultipleObjects` returned or `WaitEventOfEnumError`.
 pub inline fn waitAnyEventOfEnum(
+    comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
     comptime enumValuesLen: u64,
     /// Events from `createEventsFromEnum` function.
-    events: [enumValuesLen]zigWin.HANDLE,
+    events: *const [enumValuesLen]zigWin.HANDLE,
     /// Runtime enum values from `getRuntimeEnumValues` function.
-    enumValues: [enumValuesLen]comptime_int,
+    enumValues: *const [enumValuesLen]TagType,
     /// Time in milliseconds
     timeoutMs: u32,
-) WaitEventOfEnumError!comptime_int {
+) WaitEventOfEnumError!TagType {
     const waitResult = win.WaitForMultipleObjects(events.len, events, win.FALSE, timeoutMs);
 
     if (waitResult == win.WAIT_FAILED) {
