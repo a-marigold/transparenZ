@@ -99,6 +99,37 @@ fn initXamlDiags(
 
     const currentPid = win.GetCurrentProcessId();
 
+    const InitXamlDiagsRoutine = struct {
+        pub const Context = struct {
+            /// Pointer to which assign result of `InitializeXamlDiagnosticsEx`.
+            result: *win.HRESULT,
+
+            /// Pointer to the `InitializeXamlDiagnosticsEx` function.
+            initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
+
+            // `InitializeXamlDiagnosticsEx` parameters
+            endPointName: [:0]const u16,
+            pid: zigWin.DWORD,
+            wszTAPDllName: [:0]const u16,
+            tapClsid: *const zigWin.GUID,
+        };
+        /// Used as start routine of a thread in the loop below.
+        fn routine(
+            context: *@This().Context,
+        ) callconv(.winapi) zigWin.DWORD {
+            context.result.* = context.initializeXamlDiagnosticsEx(
+                context.endPointName,
+                context.pid,
+                null,
+                context.wszTAPDllName,
+                context.tapClsid,
+                null,
+            );
+
+            return 0;
+        }
+    };
+
     // Name of diagnostics must be unique in the whole system.
     //
     // Start with 10 to have stable length.
@@ -126,9 +157,8 @@ fn initXamlDiags(
         // 'cause it works only once per thread
 
         const initXamlDiagsRoutineThread = utils.createThread(
-            @ptrCast(&initXamlDiagsRoutine),
-
-            @constCast(&InitXamlDiagsRoutineContext{
+            @ptrCast(&InitXamlDiagsRoutine.routine),
+            @constCast(&InitXamlDiagsRoutine{
                 .result = &initXamlDiagsResult,
 
                 .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
@@ -165,37 +195,6 @@ fn initXamlDiags(
 
     // Neccessarily indicate success
     setUiDllCodeEvent(.Success);
-
-    return 0;
-}
-
-const InitXamlDiagsRoutineContext = struct {
-    /// Pointer to which assign result of `InitializeXamlDiagnosticsEx`.
-    result: *win.HRESULT,
-
-    /// Pointer to the `InitializeXamlDiagnosticsEx` function.
-    initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
-
-    // `InitializeXamlDiagnosticsEx` parameters
-
-    endPointName: [:0]const u16,
-    pid: zigWin.DWORD,
-    wszTAPDllName: [:0]const u16,
-    tapClsid: *const zigWin.GUID,
-};
-
-/// Used as start routine of a thread in `initXamlDiagnostics`.
-fn initXamlDiagsRoutine(
-    context: *InitXamlDiagsRoutineContext,
-) callconv(.winapi) zigWin.DWORD {
-    context.result.* = context.initializeXamlDiagnosticsEx(
-        context.endPointName,
-        context.pid,
-        null,
-        context.wszTAPDllName,
-        context.tapClsid,
-        null,
-    );
 
     return 0;
 }
