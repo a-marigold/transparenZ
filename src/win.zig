@@ -1,12 +1,8 @@
 //! Definitions of `win32` types used in `transparenZ`.
 //!
 //! Contains only types that are missing in `std.os.windows`.
-//!
-//! ### This module is going to be deprecated (see `TODO` section in `README.md`).
 
 pub const zigWin = @import("std").os.windows;
-
-// TODO: add no-ops for IUnknown
 
 pub const LPDWORD = *zigWin.DWORD;
 
@@ -69,6 +65,34 @@ pub const IUnknown = extern struct {
     };
 };
 
+pub const IID_IUnknown: zigWin.GUID = .{
+    .Data1 = 0x00000000,
+    .Data2 = 0x0000,
+    .Data3 = 0x0000,
+    .Data4 = .{ 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46 },
+};
+
+/// Not a part of winapi.
+///
+/// Many interfaces declared in `transparenZ` are inherited from `IUnknown`,
+/// they don't need all the methods of `IUnknown`.
+///
+/// Contains correct no-op fns to be used in `IUnknown` not to bloat binary with identical functions.
+///
+/// Does not contain `QueryInterface` 'cause this function is always not a no-op.
+pub const IUnknownNoOpMethods = struct {
+    fn refManagingNoOp(self: *anyopaque) callconv(.winapi) zigWin.ULONG {
+        _ = self;
+
+        // `1` means there is one reference on this object left
+        return 1;
+    }
+
+    pub const AddRef = refManagingNoOp;
+
+    pub const Release = refManagingNoOp;
+};
+
 pub const IID_IObjectWithSite = zigWin.GUID{
     .Data1 = 0xfc4801a3,
     .Data2 = 0x2ba9,
@@ -83,7 +107,7 @@ pub const IObjectWithSite = extern struct {
         AddRef: @FieldType(IUnknown.VTable, "AddRef"),
         Release: @FieldType(IUnknown.VTable, "Release"),
         SetSite: *const fn (self: *anyopaque, pUnkSite: *IUnknown) callconv(.winapi) HRESULT,
-        GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: **anyopaque) callconv(.winapi) HRESULT,
+        GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: *?*anyopaque) callconv(.winapi) HRESULT,
     };
 };
 
@@ -176,7 +200,7 @@ pub const IVisualTreeServiceCallback = extern struct {
     };
 };
 
-const IShape = struct {
+pub const IShape = struct {
     vtable: *const VTable,
     pub const VTable = struct {
         QueryInterface: @FieldType(IInspectable.VTable, "QueryInterface"),

@@ -21,17 +21,8 @@ vtable: *const win.IObjectWithSite.VTable,
 /// Pointer to `IXamlDiagnostics`.
 ///
 /// Initialized in `taskbarHook.vtable.SetSite`,
-/// when the OS calls this function after executing `DllGetClassObject`.
+/// when `InitializeXamlDiagnosticsEx` calls this function after executing `DllGetClassObject`.
 iXamlDiagnostics: ?*win.IXamlDiagnostics,
-
-/// `AddRef` and `Release` no-op implemenation of `taskbarHook`.
-///
-/// It is no-op 'cause `taskbarHook` is a singleton and it is useless to manage its lifetime
-fn refMangingNoopFn(self: *anyopaque) callconv(.winapi) zigWin.ULONG {
-    _ = self;
-    // Returning `1` means `taskbarHook`'s ref count is one
-    return 1;
-}
 
 /// Singleton intended to be located in `.data` instead of heap.
 ///
@@ -52,9 +43,9 @@ pub var taskbarHook: TaskbarHook = .{
             }
         }.QueryInterface,
 
-        .AddRef = TaskbarHook.refMangingNoopFn,
+        .AddRef = win.IUnknownNoOpMethods.AddRef,
 
-        .Release = TaskbarHook.refMangingNoopFn,
+        .Release = win.IUnknownNoOpMethods.Release,
 
         .SetSite = struct {
             fn SetSite(self: *anyopaque, pUnkSite: ?*win.IUnknown) callconv(.winapi) win.HRESULT {
@@ -82,15 +73,13 @@ pub var taskbarHook: TaskbarHook = .{
             fn GetSite(
                 self: *anyopaque,
                 riid: *const zigWin.GUID,
-                ppvSite: **anyopaque,
+                ppvSite: *?*anyopaque,
             ) callconv(.winapi) win.HRESULT {
-                _ = self;
                 _ = riid;
-                _ = ppvSite;
 
-                // `InitializeXamlDiagnosticsEx` never causes call of `GetSite`
-                // So it is no-op
-                return .E_NOINTERFACE;
+                ppvSite.* = @as(*TaskbarHook, @ptrCast(self)).iXamlDiagnostics;
+
+                return .S_OK;
             }
         }.GetSite,
     },
