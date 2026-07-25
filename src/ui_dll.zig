@@ -223,48 +223,6 @@ fn registerVisualTreeServiceCallback(
     return .E_FAIL;
 }
 
-const iVisualTreeServiceCallback: *win.IVisualTreeServiceCallback = &.{
-    .vtable = &.{
-        .QueryInterface = @FieldType(IUnknown.VTable, "QueryInterface"),
-        .AddRef = @FieldType(IUnknown.VTable, "AddRef"),
-        .Release = @FieldType(IUnknown.VTable, "Release"),
-        .OnVisualTreeChange = *const fn (
-            self: *anyopaque,
-            relation: *anyopaque,
-            element: VisualElement,
-            mutationType: VisualMutationType,
-        ) callconv(.winapi) HRESULT,
-    },
-};
-/// Used as `IVisualTreeServiceCallback.vtable.OnVisualTreeChange`.
-///
-/// Triggered immediatly after callback is registered
-/// or taskbar elements are changed during work.
-fn onVisualTreeChange(
-    self: *anyopaque,
-    relation: *anyopaque,
-    element: win.VisualElement,
-    mutationType: win.VisualMutationType,
-) callconv(.winapi) win.HRESULT {
-    _ = self;
-    _ = relation;
-
-    if (mutationType == .Add) {
-        if (std.mem.eql(u16, element.Name, TaskbarElementNames.BACKGROUND_FILL)) {
-            if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
-                const backgroundFill = getInspectableFromHandle(
-                    win.IShape,
-                    win.IID_IShape,
-                    element.Handle,
-                    iXamlDiagnostics,
-                );
-            } else {
-                // TODO: handlei
-            }
-        }
-    }
-}
-
 /// Calls `iXamlDiagnostics.GetIInspectableFromHandle` and then coerces
 /// it to `T` by using `QueryInterface` method of the inspectable with `TGuid` argument.
 inline fn getInspectableFromHandle(

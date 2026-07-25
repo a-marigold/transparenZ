@@ -1,4 +1,5 @@
 const std = @import("std");
+const unicode = std.unicode;
 const zigWin = std.os.windows;
 
 const win = @import("win.zig");
@@ -7,21 +8,15 @@ const utils = @import("utils.zig");
 
 pub const UI_DLL_FILE_NAME = "ui.dll";
 
-// const ACCENT_POLICY: win.ACCENT_POLICY = .{
-//     .AccentState = .ACCENT_ENABLE_ACRYLICBLURBEHIND,
-//
-//     .AccentFlags = 0,
-//     .GradientColor = 0x010000,
+/// The windows class name of task bar.
+pub const TASKBAR_CLASS_NAME = "Shell_TrayWnd";
 
-//     .AnimationId = 0,
-// };
+pub const WINDOWS_UI_XAML_DLL_NAME = "Windows.UI.Xaml.dll";
 
-// pub const TASKBAR_COMPOSITION_ATTRIB_DATA: win.WINDOWCOMPOSITIONATTRIBDATA = .{
-//     .Attrib = .WCA_ACCENT_POLICY,
-//
-//     .pvData = &ACCENT_POLICY,
-//     .cbData = @sizeOf(win.ACCENT_POLICY),
-// };
+pub const TaskbarElementNames = struct {
+    pub const BACKGROUND_FILL = unicode.utf8ToUtf16LeStringLiteral("BackgroundFill");
+    pub const BACKGROUND_STROKE = unicode.utf8ToUtf16LeStringLiteral("BackgroundStroke");
+};
 
 /// Used to share successfull completion of taskbar styling or an error from `ui.dll` to main process.
 ///
@@ -40,8 +35,10 @@ pub const UiDllCode = enum(usize) {
     Success,
 
     GetExeDirFail,
+
     InitXamlDiagsFail,
-    VisualTreeServiceFail,
+
+    InitVisualTreeServiceFail,
 
     /// See `UiDllCode`.
     pub const EVENT_NAME_PREFIX = "Local\\\\tZyC";
@@ -57,6 +54,7 @@ pub const MainErrors = struct {
     pub const GET_EXE_PATH_FAIL = "Failed to get path to the 'transparenZ' executable.";
 
     pub const ALLOC_UI_DLL_FILE_NAME_FAIL = "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' path string in explorer.exe.";
+
     pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
 
     pub const UI_DLL_CODE_EVENT_CREATION_FAILED = "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
@@ -76,7 +74,7 @@ pub const UI_DLL_ERRORS = block: {
 
     errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] = "Failed to initialize XAML diagnostics.";
 
-    errors[@intFromEnum(UiDllCode.VisualTreeServiceFail)] = "Failed to initialize 'IVisualTreeService'.";
+    errors[@intFromEnum(UiDllCode.InitVisualTreeServiceFail)] = "Failed to initialize 'IVisualTreeService'.";
 
     break :block errors;
 };
@@ -98,13 +96,14 @@ pub const UTF16_NUMBERS = block: {
     var numbers: [quantity][:0]const u16 = undefined;
 
     var number = 0;
+
     while (number < quantity) : (number += 1) {
         const utf8Number = std.fmt.comptimePrint("{d}", .{number});
 
         const utf16Number: [utf8Number.len:0]u16 = numberBlock: {
             var result: [utf8Number.len:0]u16 = undefined;
 
-            _ = std.unicode.utf8ToUtf16Le(&result, utf8Number) catch |err| {
+            _ = unicode.utf8ToUtf16Le(&result, utf8Number) catch |err| {
                 @compileError(err);
             };
 
