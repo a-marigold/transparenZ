@@ -103,7 +103,6 @@ fn initXamlDiags(
         pub const Context = struct {
             /// Pointer to which assign result of `InitializeXamlDiagnosticsEx`.
             result: *win.HRESULT,
-
             /// Pointer to the `InitializeXamlDiagnosticsEx` function.
             initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
 
@@ -114,9 +113,7 @@ fn initXamlDiags(
             tapClsid: *const zigWin.GUID,
         };
         /// Used as start routine of a thread in the loop below.
-        fn routine(
-            context: *@This().Context,
-        ) callconv(.winapi) zigWin.DWORD {
+        fn routine(context: *@This().Context) callconv(.winapi) zigWin.DWORD {
             context.result.* = context.initializeXamlDiagnosticsEx(
                 context.endPointName,
                 context.pid,
@@ -130,11 +127,23 @@ fn initXamlDiags(
         }
     };
 
-    // Name of diagnostics must be unique in the whole system.
-    //
-    // Start with 10 to have stable length.
-    // If start with 0-9 numbers, there is an unused whitespace
+    // Use anonymous struct to allocate it once in `.data` section for perf
+    var routineContext = &struct {
+        var context: InitXamlDiagsRoutine.Context = .{
+            // Assigned in the loop
+            .result = undefined,
+            .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
 
+            // Assigned in the loop
+            .endPointName = undefined,
+            .pid = currentPid,
+            .wszTAPDllName = &uiDllPath.buffer,
+            .tapClsid = &TaskbarHook.TASKBAR_HOOK_GUID,
+        };
+    }.context;
+
+    // Name of diagnostics must be unique in the whole system.
+    // Start with 10, 'cause if start with 0-9 numbers, there is an unused whitespace or unstable length
     var diagsName: [5:0]u16 = ("tZy" ++ constants.UTF16_NUMBERS[10]).*;
 
     const maxAttemptCount = 60;
@@ -153,20 +162,14 @@ fn initXamlDiags(
     }) {
         var initXamlDiagsResult: win.HRESULT = undefined;
 
+        routineContext.result = &initXamlDiagsResult;
+        routineContext.endPointName = &diagsName;
+
         // Call `InitializeXamlDiagnosticsEx` in another thread
         // 'cause it works only once per thread
-
         const initXamlDiagsRoutineThread = utils.createThread(
             @ptrCast(&InitXamlDiagsRoutine.routine),
-            @constCast(&InitXamlDiagsRoutine{
-                .result = &initXamlDiagsResult,
-
-                .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
-                .endPointName = &diagsName,
-                .pid = currentPid,
-                .wszTAPDllName = &uiDllPath.buffer,
-                .tapClsid = &TaskbarHook.TASKBAR_HOOK_GUID,
-            }),
+            @constCast(routineContext),
         );
 
         if (initXamlDiagsRoutineThread) |thread| {
@@ -211,7 +214,6 @@ fn registerVisualTreeServiceCallback(
     _ = iXamlDiagnostics.vtable.QueryInterface(
         iXamlDiagnostics,
         &win.IID_IVisualTreeService,
-
         @ptrCast(&iVisualTreeService),
     );
 
@@ -221,6 +223,64 @@ fn registerVisualTreeServiceCallback(
 
     return .E_FAIL;
 }
+
+/// Used as callback for `IVisualTreeService.vtable.AdviseVisualTreeChange`.
+///
+/// Triggered immediatly after callback is registered
+/// or taskbar elements are changed during work.
+const iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
+    .vtable = &.{
+        .QueryInterface = struct {
+            fn QueryInterface(self: *anyopaque, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) win.HRESULT {
+                const riidValue = riid.*;
+
+                if (std.meta.eql(
+                    riidValue,
+                    win.IID_IUnknown,
+                ) or std.meta.eql(
+                    riidValue,
+                    win.IID_IVisualTreeServiceCallback,
+                )) {
+                    ppvObject.* = self;
+
+                    return .S_OK;
+                }
+
+                return .E_NOINTERFACE;
+            }
+        },
+
+        .AddRef = win.IUnknownNoOpMethods.AddRef,
+        .Release = win.IUnknownNoOpMethods.Release,
+
+        .OnVisualTreeChange = struct {
+            fn OnVisualTreeChange(
+                self: *anyopaque,
+                relation: *anyopaque,
+                element: win.VisualElement,
+                mutationType: win.VisualMutationType,
+            ) callconv(.winapi) win.HRESULT {
+                _ = self;
+                _ = relation;
+
+                if (mutationType == .Add) {
+                    if (std.mem.eql(u16, element.Name, TaskbarElementNames.BACKGROUND_FILL)) {
+                        if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
+                            const backgroundFill = getInspectableFromHandle(
+                                win.IShape,
+                                win.IID_IShape,
+                                element.Handle,
+                                iXamlDiagnostics,
+                            );
+                        } else {
+                            // TODO: handlei
+                        }
+                    }
+                }
+            }
+        }.OnVisualTreeChange,
+    },
+};
 
 /// Calls `iXamlDiagnostics.GetIInspectableFromHandle` and then coerces
 /// it to `T` by using `QueryInterface` method of the inspectable with `TGuid` argument.
