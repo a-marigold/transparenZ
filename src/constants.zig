@@ -35,10 +35,10 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
     Success,
 
     GetExePathFail,
-
     InitXamlDiagsFail,
-
-    InitVisualTreeServiceFail,
+    RegisterTreeServiceCallbackFail,
+    GetIShapeInCallbackFail,
+    IXamlDiagnosticsNullInCallback,
 
     /// See `UiDllCode`.
     pub const EVENT_NAME_PREFIX = "Local\\\\tZyC";
@@ -74,7 +74,11 @@ pub const UI_DLL_ERRORS = block: {
 
     errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] = "Failed to initialize XAML diagnostics.";
 
-    errors[@intFromEnum(UiDllCode.InitVisualTreeServiceFail)] = "Failed to initialize 'IVisualTreeService'.";
+    errors[@intFromEnum(UiDllCode.RegisterTreeServiceCallbackFail)] = "Failed to register tree service callback.";
+
+    errors[@intFromEnum(UiDllCode.GetIShapeInCallbackFail)] = "Failed to get 'IShape' interface inside tree service callback.";
+
+    errors[@intFromEnum(UiDllCode.IXamlDiagnosticsNullInCallback)] = "'IXamlDiagnostics' unexpectedly equals 'null' in tree service callback.";
 
     break :block errors;
 };

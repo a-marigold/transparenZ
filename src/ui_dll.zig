@@ -198,7 +198,7 @@ fn init(
         );
 
         if (registerCallbackResult != .S_OK) {
-            setUiDllCodeEvent(.RegisterVisualTreeServiceCallbackFail);
+            setUiDllCodeEvent(.RegisterTreeServiceCallbackFail);
 
             return .Fail;
         }
@@ -261,14 +261,14 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
                                 element.Handle,
                                 iXamlDiagnostics,
                             ) orelse {
-                                // setUiDllCodeEvent(.RegisterVisualTreeServiceCallbackFail);
+                                setUiDllCodeEvent(.GetIShapeInCallbackFail);
 
                                 return .E_FAIL;
                             };
 
                             backgroundFill.vtable.put_Fill(null);
                         } else {
-                            // TODO: handlei
+                            setUiDllCodeEvent(.IXamlDiagnosticsNullInTreeServiceCallback);
 
                             return .E_FAIL;
                         }
@@ -329,7 +329,6 @@ inline fn getInspectableFromHandle(
 
     return null;
 }
-
 inline fn setUiDllCodeEvent(code: UiDllCode) void {
     _ = utils.setEventOfEnum(
         UiDllCode.EVENT_NAME_PREFIX,
