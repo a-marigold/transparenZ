@@ -15,7 +15,9 @@ const UiDllCode = constants.UiDllCode;
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = trace;
     _ = ret_addr;
+
     // Safe stderr writing without allocations
+
     if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
         @branchHint(.likely);
 
@@ -30,6 +32,7 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
             );
         }
     }
+
     utils.exit(1);
 }
 
@@ -43,21 +46,28 @@ pub fn main() void {
         @panic(MainErrors.OPEN_EXPLORER_FAIL);
     };
 
-    const uiDllPath = block: {
-        var exeDirPath = utils.getExeDirPath() orelse {
+    const uiDllPath: [:0]u16 = block: {
+        var buffer: [zigWin.MAX_PATH:0]u16 = undefined;
+
+        const exePath = utils.getExePath(null, &buffer) orelse {
             @branchHint(.cold);
 
             @panic(MainErrors.GET_EXE_PATH_FAIL);
         };
 
-        utils.exeDirPathToUiDllPath(&exeDirPath);
+        const exeDirName = utils.getDirPath(exePath, .Preserve);
 
-        break :block exeDirPath;
+        break :block utils.appendPathStringLiteral(
+            exeDirName,
+            unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
+        );
     };
 
+    const uiDllPathSizeWithNullTerminator = uiDllPath.len * @sizeOf(zigWin.WCHAR);
+
     const uiDllPathStartAddress = utils.allocWriteProcessMemory(
-        &uiDllPath.buffer,
-        uiDllPath.len * @sizeOf(zigWin.WCHAR),
+        uiDllPath.ptr,
+        uiDllPathSizeWithNullTerminator,
         explorerProcess,
     ) orelse {
         @branchHint(.cold);
