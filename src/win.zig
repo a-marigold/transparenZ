@@ -219,7 +219,7 @@ pub const IShape = struct {
         GetRuntimeClassName: @FieldType(IInspectable.VTable, "GetRuntimeClassName"),
         GetTrustLevel: @FieldType(IInspectable.VTable, "GetTrustLevel"),
         get_Fill: *const fn (**anyopaque) callconv(.winapi) i32,
-        put_Fill: *const fn (*anyopaque) callconv(.winapi) i32,
+        put_Fill: *const fn (self: *IShape, *anyopaque) callconv(.winapi) i32,
         get_Stroke: *const fn (**anyopaque) callconv(.winapi) i32,
         put_Stroke: *const fn (*anyopaque) callconv(.winapi) i32,
         get_StrokeMiterLimit: *const fn (*anyopaque) callconv(.winapi) i32,

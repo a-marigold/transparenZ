@@ -198,7 +198,7 @@ fn init(
         );
 
         if (registerCallbackResult != .S_OK) {
-            setUiDllCodeEvent(.InitVisualTreeServiceFail);
+            setUiDllCodeEvent(.RegisterVisualTreeServiceCallbackFail);
 
             return .Fail;
         }
@@ -213,27 +213,6 @@ fn init(
 
     return .Success;
 }
-/// Queries `IVisualTreeService` from `iXamlDiagnostics` argument and then registers `callback` via `AdviseVisualTreeChange`.
-/// Returns result of `AdviseVisualTreeChange` or `HRESULT.E_FAIL` if querying `IVisualTreeService` failed.
-fn registerVisualTreeServiceCallback(
-    iXamlDiagnostics: *win.IXamlDiagnostics,
-    callback: *win.IVisualTreeServiceCallback,
-) win.HRESULT {
-    var iVisualTreeService: ?*win.IVisualTreeService = null;
-
-    _ = iXamlDiagnostics.vtable.QueryInterface(
-        iXamlDiagnostics,
-        &win.IID_IVisualTreeService,
-        @ptrCast(&iVisualTreeService),
-    );
-    if (iVisualTreeService) |treeService| {
-        return treeService.vtable.AdviseVisualTreeChange(treeService, callback);
-    }
-    return .E_FAIL;
-}
-
-// TODO: iVisualTreeServiceCallback commit
-
 /// Used as callback for `IVisualTreeService.vtable.AdviseVisualTreeChange`.
 ///
 /// Triggered immediatly after callback is registered
@@ -269,13 +248,60 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
                 relation: *anyopaque,
                 element: win.VisualElement,
                 mutationType: win.VisualMutationType,
-            ) callconv(.winapi) win.HRESULT {}
+            ) callconv(.winapi) win.HRESULT {
+                _ = self;
+                _ = relation;
+
+                if (mutationType == .Add) {
+                    if (std.mem.eql(u16, element.Name, TaskbarElementNames.BACKGROUND_FILL)) {
+                        if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
+                            const backgroundFill = getInspectableFromHandle(
+                                win.IShape,
+                                win.IID_IShape,
+                                element.Handle,
+                                iXamlDiagnostics,
+                            ) orelse {
+                                // setUiDllCodeEvent(.RegisterVisualTreeServiceCallbackFail);
+
+                                return .E_FAIL;
+                            };
+
+                            backgroundFill.vtable.put_Fill(null);
+                        } else {
+                            // TODO: handlei
+
+                            return .E_FAIL;
+                        }
+                    }
+                }
+
+                return .S_OK;
+            }
         }.OnVisualTreeChange,
     },
 };
 
+/// Queries `IVisualTreeService` from `iXamlDiagnostics` argument and then registers `callback` via `AdviseVisualTreeChange`.
+/// Returns result of `AdviseVisualTreeChange` or `HRESULT.E_FAIL` if querying `IVisualTreeService` failed.
+fn registerVisualTreeServiceCallback(
+    iXamlDiagnostics: *win.IXamlDiagnostics,
+    callback: *win.IVisualTreeServiceCallback,
+) win.HRESULT {
+    var iVisualTreeService: ?*win.IVisualTreeService = null;
+
+    _ = iXamlDiagnostics.vtable.QueryInterface(
+        iXamlDiagnostics,
+        &win.IID_IVisualTreeService,
+        @ptrCast(&iVisualTreeService),
+    );
+    if (iVisualTreeService) |treeService| {
+        return treeService.vtable.AdviseVisualTreeChange(treeService, callback);
+    }
+    return .E_FAIL;
+}
+
 /// Calls `iXamlDiagnostics.GetIInspectableFromHandle` and then coerces
-/// it to `T` by using `QueryInterface` method of the inspectable with `TGuid` argument.
+/// its result to `T` by using `QueryInterface` method of the inspectable with `TGuid` argument.
 inline fn getInspectableFromHandle(
     comptime T: type,
     /// `GUID` of `T`.
@@ -300,6 +326,7 @@ inline fn getInspectableFromHandle(
             return inspectablePointer;
         }
     }
+
     return null;
 }
 
