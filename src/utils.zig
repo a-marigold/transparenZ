@@ -126,38 +126,47 @@ pub fn allocWriteProcessMemory(
     return startAddress;
 }
 
+const ThreadRoutine = fn (routineArg: ?*anyopaque) callconv(.winapi) ThreadReturnValue;
+
+pub const ThreadReturnValue = enum(zigWin.DWORD) {
+    Success = 0,
+    Fail = 1,
+};
+
 /// High-level wrapper over `CreateThread` win api.
 ///
 /// Returns handle to created thread or `null` in case of error.
 pub inline fn createThread(
     /// Init function.
-    startRoutine: *const zigWin.THREAD_START_ROUTINE,
+    routine: *const ThreadRoutine,
     /// `lpParameter` of `CreateThread`.
     routineArg: ?*anyopaque,
 ) ?zigWin.HANDLE {
     return win.CreateThread(
         null,
         0,
-        startRoutine,
+        @ptrCast(routine),
         routineArg,
         0,
         null,
     );
 }
 
+const RemoteThreadRoutine = fn (routineArg: ?*anyopaque) callconv(.winapi) zigWin.DWORD;
+
 /// High-level wrapper over `CreateRemoteThread` win api.
 pub inline fn createRemoteThread(
     /// Process in which to create thread.
     process: zigWin.HANDLE,
-    startRoutine: *const zigWin.THREAD_START_ROUTINE,
-    /// `lpParameter` of `CreateRemoteThread`.
+    routine: *const RemoteThreadRoutine,
+    /// `lpParameter` of `CreateRemoteThread`. Must be in address space of `process`.
     routineArg: ?*anyopaque,
 ) ?zigWin.HANDLE {
     return win.CreateRemoteThread(
         process,
         null,
         0,
-        startRoutine,
+        routine,
         routineArg,
         0,
         null,
@@ -174,6 +183,7 @@ pub inline fn joinThread(thread: zigWin.HANDLE) void {
 /// Exits the current process.
 pub inline fn exit(exitCode: zigWin.UINT) noreturn {
     _ = win.TerminateProcess(win.GetCurrentProcess(), exitCode);
+
     unreachable;
 }
 
