@@ -58,7 +58,8 @@ pub fn main() void {
         const exeDirName = utils.getDirPath(exePath, .Preserve);
 
         break :block utils.appendPathStringLiteral(
-            exeDirName,
+            &buffer,
+            exeDirName.len,
             unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
         );
     };
@@ -98,7 +99,7 @@ pub fn main() void {
 
     _ = utils.createRemoteThread(
         explorerProcess,
-        @ptrCast(loadLibraryW),
+        @ptrCast(@alignCast(loadLibraryW)),
         uiDllPathStartAddress,
     );
 

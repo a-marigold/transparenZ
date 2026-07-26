@@ -51,17 +51,17 @@ pub inline fn getDirPath(path: []u16, trailingSlash: enum(usize) { Skip = 1, Pre
     return path[0..dirPathLen];
 }
 
+/// Copies `literal` to `path` starting from `startIndex`, including null terminator.
+///
 /// `path` must not have trailing backslash.
 ///
-/// Copies `literal` to `path`, including null terminator.
-///
 /// Returns slice of path with copied `literal`.
-pub inline fn appendPathStringLiteral(path: []u16, comptime literal: [:0]const u16) [:0]u16 {
+pub inline fn appendPathStringLiteral(path: *[zigWin.MAX_PATH]u16, startIndex: usize, comptime literal: [:0]const u16) [:0]u16 {
     const newComponent = "\\" ++ literal;
 
-    @memcpy(path, newComponent[0 .. newComponent.len + 1]); // add `1` to include null terminator
+    @memcpy(path[startIndex..], newComponent[0 .. newComponent.len + 1]); // add `1` to include null terminator
 
-    return path[0 .. path.len + newComponent.len :0];
+    return path[0 .. startIndex + newComponent.len :0];
 }
 
 /// Opens process which owns the window of `windowClassName`.
