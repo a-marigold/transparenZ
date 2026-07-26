@@ -26,6 +26,30 @@ pub inline fn getExePath(
     return buffer[0..pathLen];
 }
 
+/// Example:
+///
+/// `path` is `".\myDir\someDir\file.zig"`.
+///
+/// ```zig
+/// getDirPath(path, .Skip); // ".\myDir\someDir"
+///
+/// getDirPath(path, .Preserve); // ".\myDir\someDir\"
+/// ```
+pub inline fn getDirPath(
+    path: []const u16,
+    trailingSlash: enum(usize) { Skip = 1, Preserve = 0 },
+) []u16 {
+    var pathIndex = path.len - 1;
+
+    const backSlash: u16 = '\\';
+
+    while (path[pathIndex] != backSlash and pathIndex >= 0) {
+        pathIndex -= 1;
+    }
+
+    return path[0 .. (pathIndex - @intFromEnum(trailingSlash)) + 1]; // `+ 1` to keep last char
+}
+
 /// Opens process which owns the window of `windowClassName`.
 ///
 /// Passes `dwDesiredAccess` to `win.GetWindowThreadProcessId`.
