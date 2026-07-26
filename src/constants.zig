@@ -31,10 +31,10 @@ pub const TaskbarElementNames = struct {
 /// Example of how event names combined:
 ///
 /// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\\\\SomePrefix1"`.
-pub const UiDllCode = enum(usize) {
+pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI_DLL_ERRORS` array
     Success,
 
-    GetExeDirFail,
+    GetExePathFail,
 
     InitXamlDiagsFail,
 
@@ -70,7 +70,7 @@ pub const MainErrors = struct {
 pub const UI_DLL_ERRORS = block: {
     var errors: [@typeInfo(UiDllCode).@"enum".field_values.len][:0]const u8 = undefined;
 
-    errors[@intFromEnum(UiDllCode.GetExeDirFail)] = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+    errors[@intFromEnum(UiDllCode.GetExePathFail)] = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
 
     errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] = "Failed to initialize XAML diagnostics.";
 
@@ -112,6 +112,5 @@ pub const UTF16_NUMBERS = block: {
 
         numbers[number] = &utf16Number;
     }
-
     break :block numbers;
 };

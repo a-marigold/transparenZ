@@ -92,7 +92,7 @@ fn init(
 
         break :block utils.getExePath(@ptrCast(dllHandle), &buffer);
     } orelse {
-        setUiDllCodeEvent(.GetExeDirFail);
+        setUiDllCodeEvent(.GetExePathFail);
 
         return .Fail;
     };
@@ -194,7 +194,7 @@ fn init(
     if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
         const registerCallbackResult = registerVisualTreeServiceCallback(
             iXamlDiagnostics,
-            .{},
+            &iVisualTreeServiceCallback,
         );
 
         if (registerCallbackResult != .S_OK) {
@@ -238,7 +238,7 @@ fn registerVisualTreeServiceCallback(
 ///
 /// Triggered immediatly after callback is registered
 /// or taskbar elements are changed during work.
-const iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
+var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
     .vtable = &.{
         .QueryInterface = struct {
             fn QueryInterface(self: *anyopaque, riid: *const zigWin.GUID, ppvObject: *?*anyopaque) callconv(.winapi) win.HRESULT {
@@ -318,7 +318,6 @@ inline fn getInspectableFromHandle(
             return inspectablePointer;
         }
     }
-
     return null;
 }
 
