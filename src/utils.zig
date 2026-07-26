@@ -13,8 +13,8 @@ pub inline fn getExePath(
     /// `null` treated as current module handle.
     module: ?zigWin.HMODULE,
     /// Receives the result.
-    buffer: *[zigWin.MAX_PATH]u16,
-) ?[]u16 {
+    buffer: *[zigWin.MAX_PATH:0]u16,
+) ?[:0]u16 {
     const pathLen = win.GetModuleFileNameW(module, buffer, buffer.len);
 
     if (pathLen == 0) {
@@ -23,9 +23,11 @@ pub inline fn getExePath(
         return null;
     }
 
-    return buffer[0..pathLen];
+    return @ptrCast(buffer[0..pathLen]);
 }
 
+/// Does not add null terminator to the end of dir path.
+///
 /// Example:
 ///
 /// `path` is `".\myDir\someDir\file.zig"`.
@@ -33,12 +35,9 @@ pub inline fn getExePath(
 /// ```zig
 /// getDirPath(path, .Skip); // ".\myDir\someDir"
 ///
-/// getDirPath(path, .Preserve); // ".\myDir\someDir\"
+/// getDirPath(path, .Preserve); // ".\myDir\someDir"
 /// ```
-pub inline fn getDirPath(
-    path: []const u16,
-    trailingSlash: enum(usize) { Skip = 1, Preserve = 0 },
-) []u16 {
+pub inline fn getDirPath(path: []u16, trailingSlash: enum(usize) { Skip = 1, Preserve = 0 }) []u16 {
     var pathIndex = path.len - 1;
 
     const backSlash: u16 = '\\';
@@ -47,7 +46,22 @@ pub inline fn getDirPath(
         pathIndex -= 1;
     }
 
-    return path[0 .. (pathIndex - @intFromEnum(trailingSlash)) + 1]; // `+ 1` to keep last char
+    const dirPathLen = (pathIndex - @intFromEnum(trailingSlash)) + 1;
+
+    return path[0..dirPathLen];
+}
+
+/// `path` must not have trailing backslash.
+///
+/// Copies `literal` to `path`, including null terminator.
+///
+/// Returns slice of path with copied `literal`.
+pub inline fn appendPathStringLiteral(path: []u16, comptime literal: [:0]const u16) [:0]u16 {
+    const newComponent = "\\" ++ literal;
+
+    @memcpy(path, newComponent[0 .. newComponent.len + 1]); // add `1` to include null terminator
+
+    return path[0 .. path.len + newComponent.len :0];
 }
 
 /// Opens process which owns the window of `windowClassName`.
