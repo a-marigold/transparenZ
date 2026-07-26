@@ -10,16 +10,19 @@ const zigWin = std.os.windows;
 
 const win = @import("win.zig");
 const constants = @import("constants.zig");
-
 const utils = @import("utils.zig");
 
 const UiDllCode = constants.UiDllCode;
-
 const TaskbarElementNames = constants.TaskbarElementNames;
 
 const TaskbarHook = @import("taskbar_hook.zig");
 
 var taskbarHook = &TaskbarHook.taskbarHook;
+
+/// Handle of this DLL.
+///
+/// Initialized in `DllMain`.
+var dllHandle: zigWin.HINSTANCE = undefined;
 
 export fn DllMain(
     hinstDLL: zigWin.HINSTANCE,
@@ -27,6 +30,8 @@ export fn DllMain(
     lpvReserved: zigWin.LPVOID,
 ) callconv(.winapi) win.BOOL {
     _ = lpvReserved;
+
+    dllHandle = hinstDLL;
 
     if (fwdReason == win.DLL_PROCESS_ATTACH) {
         _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
@@ -63,16 +68,12 @@ export fn DllGetClassObject(
     return .CLASS_E_CLASSNOTAVAILABLE;
 }
 
-/// Loads `Windows.Ui.Xaml.dll` and calls `InitializeXamlDiagnosticsEx`.
-///
-/// `InitializeXamlDiagnosticsEx` loads this dll again, calls `DllGetClassObject`,
-/// and if it succeed `taskbarHook.xamlDiagsInterface` has `IXamlDiagnostics`,
-/// which is used to style taskbar.
+/// Loads `Windows.Ui.Xaml.dll`, calls `InitializeXamlDiagnosticsEx` and styles taskbar.
 fn initXamlDiags(
-    /// Used in `CreateThread` so this parameter is needed.
-    lpParameter: ?zigWin.LPVOID,
-) callconv(.winapi) zigWin.DWORD {
-    _ = lpParameter;
+    /// Used in `createThread` so this parameter is needed.
+    routineArg: ?*anyopaque,
+) callconv(.winapi) utils.ThreadReturnValue {
+    _ = routineArg;
 
     const winUiXamlDll = win.LoadLibraryExW(
         unicode.utf8ToUtf16LeStringLiteral(constants.WINDOWS_UI_XAML_DLL_NAME),
@@ -82,19 +83,18 @@ fn initXamlDiags(
 
     const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
         winUiXamlDll,
+
         "InitializeXamlDiagnosticsEx",
     ));
 
     const uiDllPath = block: {
-        var exeDirPath = utils.getExeDirPath() orelse {
-            setUiDllCodeEvent(.GetExeDirFail);
+        var buffer: [zigWin.MAX_PATH:0]u16 = undefined;
 
-            return 1;
-        };
+        break :block utils.getExePath(@ptrCast(dllHandle), &buffer);
+    } orelse {
+        setUiDllCodeEvent(.GetExeDirFail);
 
-        utils.exeDirPathToUiDllPath(&exeDirPath);
-
-        break :block exeDirPath;
+        return .Fail;
     };
 
     const currentPid = win.GetCurrentProcessId();
@@ -107,40 +107,47 @@ fn initXamlDiags(
             initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx,
 
             // `InitializeXamlDiagnosticsEx` parameters
+
             endPointName: [:0]const u16,
             pid: zigWin.DWORD,
-            wszTAPDllName: [:0]const u16,
+            diagsDllName: [:0]const u16,
             tapClsid: *const zigWin.GUID,
         };
         /// Used as start routine of a thread in the loop below.
-        fn routine(context: *@This().Context) callconv(.winapi) zigWin.DWORD {
+        fn routine(context: *@This().Context) callconv(.winapi) utils.ThreadReturnValue {
             context.result.* = context.initializeXamlDiagnosticsEx(
                 context.endPointName,
                 context.pid,
                 null,
-                context.wszTAPDllName,
+                context.diagsDllName,
                 context.tapClsid,
                 null,
             );
 
-            return 0;
+            return .Success;
         }
     };
 
     // Use anonymous struct to allocate it once in `.data` section for perf
     var routineContext = &struct {
         var context: InitXamlDiagsRoutine.Context = .{
-            // Assigned in the loop
-            .result = undefined,
-            .initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx,
+            // Values are assigned below or in the loop
 
-            // Assigned in the loop
+            .result = undefined,
+            .initializeXamlDiagnosticsEx = undefined,
+
             .endPointName = undefined,
-            .pid = currentPid,
-            .wszTAPDllName = &uiDllPath.buffer,
-            .tapClsid = &TaskbarHook.TASKBAR_HOOK_GUID,
+            .pid = undefined,
+            .diagsDllName = undefined,
+            .tapClsid = undefined,
         };
     }.context;
+
+    routineContext.initializeXamlDiagnosticsEx = initializeXamlDiagnosticsEx;
+
+    routineContext.pid = currentPid;
+    routineContext.diagsDllName = uiDllPath;
+    routineContext.tapClsid = &TaskbarHook.TASKBAR_HOOK_GUID;
 
     // Name of diagnostics must be unique in the whole system.
     // Start with 10, 'cause if start with 0-9 numbers, there is an unused whitespace or unstable length
@@ -163,6 +170,7 @@ fn initXamlDiags(
         var initXamlDiagsResult: win.HRESULT = undefined;
 
         routineContext.result = &initXamlDiagsResult;
+
         routineContext.endPointName = &diagsName;
 
         // Call `InitializeXamlDiagnosticsEx` in another thread
@@ -191,19 +199,21 @@ fn initXamlDiags(
 
         if (registerCallbackResult != .S_OK) {
             setUiDllCodeEvent(.InitVisualTreeServiceFail);
+
+            return .Fail;
         }
     } else {
         setUiDllCodeEvent(.InitXamlDiagsFail);
+
+        return .Fail;
     }
 
     // Neccessarily indicate success
     setUiDllCodeEvent(.Success);
 
-    return 0;
+    return .Success;
 }
-
-/// Queries `IVisualTreeService` from `iXamlDiagnostics` and then registers `callback` via `AdviseVisualTreeChange`.
-///
+/// Queries `IVisualTreeService` from `iXamlDiagnostics` argument and then registers `callback` via `AdviseVisualTreeChange`.
 /// Returns result of `AdviseVisualTreeChange` or `HRESULT.E_FAIL` if querying `IVisualTreeService` failed.
 fn registerVisualTreeServiceCallback(
     iXamlDiagnostics: *win.IXamlDiagnostics,
@@ -216,13 +226,13 @@ fn registerVisualTreeServiceCallback(
         &win.IID_IVisualTreeService,
         @ptrCast(&iVisualTreeService),
     );
-
     if (iVisualTreeService) |treeService| {
         return treeService.vtable.AdviseVisualTreeChange(treeService, callback);
     }
-
     return .E_FAIL;
 }
+
+// TODO: iVisualTreeServiceCallback commit
 
 /// Used as callback for `IVisualTreeService.vtable.AdviseVisualTreeChange`.
 ///
