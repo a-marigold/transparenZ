@@ -48,6 +48,8 @@ pub const WAIT_OBJECT_0: zigWin.DWORD = 0;
 pub const WAIT_TIMEOUT: zigWin.DWORD = 0x00000102;
 pub const WAIT_FAILED: zigWin.DWORD = 0xFFFFFFFF;
 
+pub const MAXIMUM_WAIT_OBJECTS: zigWin.DWORD = 64;
+
 pub const LOAD_LIBRARY_SEARCH_SYSTEM32: zigWin.DWORD = 0x00000800;
 pub const LOAD_LIBRARY_AS_DATAFILE: zigWin.DWORD = 0x00000002;
 
@@ -198,6 +200,13 @@ pub const IVisualTreeServiceCallback = extern struct {
             mutationType: VisualMutationType,
         ) callconv(.winapi) HRESULT,
     };
+};
+
+pub const IID_IVisualTreeServiceCallback: zigWin.GUID = .{
+    .Data1 = 0xAA7A8931,
+    .Data2 = 0x80E4,
+    .Data3 = 0x4FEC,
+    .Data4 = .{ 0x8f, 0x3B, 0x55, 0x3F, 0x87, 0xB4, 0x96, 0x6E },
 };
 
 pub const IShape = struct {

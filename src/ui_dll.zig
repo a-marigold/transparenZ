@@ -269,25 +269,7 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
                 relation: *anyopaque,
                 element: win.VisualElement,
                 mutationType: win.VisualMutationType,
-            ) callconv(.winapi) win.HRESULT {
-                _ = self;
-                _ = relation;
-
-                if (mutationType == .Add) {
-                    if (std.mem.eql(u16, element.Name, TaskbarElementNames.BACKGROUND_FILL)) {
-                        if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
-                            const backgroundFill = getInspectableFromHandle(
-                                win.IShape,
-                                win.IID_IShape,
-                                element.Handle,
-                                iXamlDiagnostics,
-                            );
-                        } else {
-                            // TODO: handlei
-                        }
-                    }
-                }
-            }
+            ) callconv(.winapi) win.HRESULT {}
         }.OnVisualTreeChange,
     },
 };
