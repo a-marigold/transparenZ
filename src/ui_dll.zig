@@ -38,7 +38,7 @@ export fn DllMain(
 
         // New thread is used 'cause `initXamlDiags`
         // loads libraries and can cause loader lock
-        const thread = utils.createThread(&initXamlDiags, null);
+        const thread = utils.createThread(&init, null);
 
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
@@ -69,7 +69,7 @@ export fn DllGetClassObject(
 }
 
 /// Loads `Windows.Ui.Xaml.dll`, calls `InitializeXamlDiagnosticsEx` and styles taskbar.
-fn initXamlDiags(
+fn init(
     /// Used in `createThread` so this parameter is needed.
     routineArg: ?*anyopaque,
 ) callconv(.winapi) utils.ThreadReturnValue {
