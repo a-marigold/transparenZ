@@ -55,7 +55,7 @@ pub fn main() void {
             @panic(MainErrors.GET_EXE_PATH_FAIL);
         };
 
-        const exeDirName = utils.getDirPath(exePath, .Preserve);
+        const exeDirName = utils.getDirPath(exePath);
 
         break :block utils.appendPathStringLiteral(
             &buffer,

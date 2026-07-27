@@ -3,7 +3,6 @@ const unicode = std.unicode;
 const zigWin = std.os.windows;
 
 const win = @import("win.zig");
-
 const constants = @import("constants.zig");
 
 /// Returns slice of `buffer` or `null` in case of error.
@@ -19,7 +18,6 @@ pub inline fn getExePath(
 
     if (pathLen == 0) {
         @branchHint(.cold);
-
         return null;
     }
 
@@ -28,27 +26,15 @@ pub inline fn getExePath(
 
 /// Does not add null terminator to the end of dir path.
 ///
-/// Example:
-///
-/// `path` is `".\myDir\someDir\file.zig"`.
-///
-/// ```zig
-/// getDirPath(path, .Skip); // ".\myDir\someDir"
-///
-/// getDirPath(path, .Preserve); // ".\myDir\someDir"
-/// ```
-pub inline fn getDirPath(path: []u16, trailingSlash: enum(usize) { Skip = 1, Preserve = 0 }) []u16 {
-    var pathIndex = path.len - 1;
-
+/// Returned slice length does not include `\`.
+pub inline fn getDirPath(path: []u16) []u16 {
     const backSlash: u16 = '\\';
-
+    var pathIndex = path.len - 1;
     while (path[pathIndex] != backSlash and pathIndex >= 0) {
         pathIndex -= 1;
     }
 
-    const dirPathLen = (pathIndex - @intFromEnum(trailingSlash)) + 1;
-
-    return path[0..dirPathLen];
+    return path[0..pathIndex];
 }
 
 /// Copies `literal` to `path` starting from `startIndex` and inserts null terminator after it.
