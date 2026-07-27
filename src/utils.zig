@@ -51,7 +51,7 @@ pub inline fn getDirPath(path: []u16, trailingSlash: enum(usize) { Skip = 1, Pre
     return path[0..dirPathLen];
 }
 
-/// Copies `literal` to `path` starting from `startIndex`, including null terminator.
+/// Copies `literal` to `path` starting from `startIndex` and inserts null terminator after it.
 ///
 /// `path` must not have trailing backslash.
 ///
@@ -62,6 +62,30 @@ pub inline fn appendPathStringLiteral(path: *[zigWin.MAX_PATH]u16, startIndex: u
     @memcpy(path[startIndex..], newComponent[0 .. newComponent.len + 1]); // add `1` to include null terminator
 
     return path[0 .. startIndex + newComponent.len :0];
+}
+
+/// Returns `true` if `a` and `b` have the same amount of elements before null terminator and equality operator returned true for them all.
+pub fn compareNullTermPtrs(comptime T: type, a: [*:0]T, b: [*:0]T) bool {
+    var index = 0;
+    while (true) : (index += 1) {
+        const elA = a[index];
+        const elB = b[index];
+
+        if (elA != elB) {
+            return false;
+        }
+
+        const isAEnd = elA == 0;
+        const isBEnd = elB == 0;
+
+        if (isAEnd or isBEnd) {
+            if (isAEnd and isBEnd) {
+                return true;
+            }
+
+            return false;
+        }
+    }
 }
 
 /// Opens process which owns the window of `windowClassName`.
