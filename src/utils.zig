@@ -45,14 +45,20 @@ pub inline fn getDirPath(path: []u16) []u16 {
 pub inline fn appendPathStringLiteral(path: *[zigWin.MAX_PATH]u16, startIndex: usize, comptime literal: [:0]const u16) [:0]u16 {
     const newComponent = "\\" ++ literal;
 
-    @memcpy(path[startIndex..], newComponent[0 .. newComponent.len + 1]); // add `1` to include null terminator
+    const newComponentLenWithNullTerm = comptime newComponent.len + 1;
+
+    @memcpy(
+        path[startIndex .. startIndex + newComponentLenWithNullTerm],
+        newComponent[0..newComponentLenWithNullTerm],
+    );
 
     return path[0 .. startIndex + newComponent.len :0];
 }
 
 /// Returns `true` if `a` and `b` have the same amount of elements before null terminator and equality operator returned true for them all.
-pub fn compareNullTermPtrs(comptime T: type, a: [*:0]T, b: [*:0]T) bool {
-    var index = 0;
+pub fn compareNullTermPtrs(comptime T: type, a: [*:0]const T, b: [*:0]const T) bool {
+    var index: usize = 0;
+
     while (true) : (index += 1) {
         const elA = a[index];
         const elB = b[index];
