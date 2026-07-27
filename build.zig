@@ -13,10 +13,14 @@ const TARGETS = [_]std.Target.Query{
         .os_tag = .windows,
     },
 };
+const INSTALL_ARTIFACT_OPTIONS: Build.Step.InstallArtifact.Options = .{
+    .dest_dir = .{ .override = .prefix },
+};
+
 pub fn build(b: *Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
-    const release = b.option(
+    const isRelease = b.option(
         bool,
         "release",
         \\ Whether to apply release logic:
@@ -26,7 +30,7 @@ pub fn build(b: *Build) !void {
         ,
     ) orelse false;
 
-    if (release) {
+    if (isRelease) {
         inline for (TARGETS) |target| {
             try buildTransparenZ(b, b.resolveTargetQuery(target), optimize, true);
         }
@@ -40,15 +44,11 @@ fn buildTransparenZ(
     target: Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     /// Whether to enable release logic.
-    release: bool,
+    isRelease: bool,
 ) !void {
     const allocator = b.allocator;
-    const installStep = b.getInstallStep();
 
-    // const win32DepModule = b.dependency("win32", .{
-    //     .target = target,
-    //     .optimize = optimize,
-    // }).module("win32");
+    const installStep = b.getInstallStep();
 
     const exe = b.addExecutable(.{
         .name = "transparenZ",
@@ -57,42 +57,44 @@ fn buildTransparenZ(
             .target = target,
             .optimize = optimize,
             .single_threaded = true,
-            .strip = release,
-            .error_tracing = !release,
-            .omit_frame_pointer = release,
-            .unwind_tables = if (release) .none else null,
+            .strip = isRelease,
+            .error_tracing = !isRelease,
+            .omit_frame_pointer = isRelease,
+            .unwind_tables = if (isRelease) .none else null,
         }),
     });
 
-    // exe.root_module.addImport("win32", win32DepModule);
-
     b.installArtifact(exe);
 
+    installStep.dependOn(
+        &b.addInstallArtifact(exe, INSTALL_ARTIFACT_OPTIONS).step,
+    );
+
     const uiDll = b.addLibrary(.{
-        .name = constants.UI_DLL_FILE_NAME,
+        .name = std.fs.path.stem(constants.UI_DLL_FILE_NAME),
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/ui_dll.zig"),
             .target = target,
             .optimize = optimize,
             .strip = true,
-            .error_tracing = !release,
-            .omit_frame_pointer = release,
-            .unwind_tables = if (release) .none else null,
+            .error_tracing = !isRelease,
+            .omit_frame_pointer = isRelease,
+            .unwind_tables = if (isRelease) .none else null,
         }),
         .linkage = .dynamic,
     });
 
-    // exe.root_module.addImport("win32", win32DepModule);
+    installStep.dependOn(
+        &b.addInstallArtifact(uiDll, INSTALL_ARTIFACT_OPTIONS).step,
+    );
 
-    b.installArtifact(uiDll);
-
-    if (release) {
+    if (isRelease) {
         const runTar = b.addSystemCommand(&.{
             "tar",
             "-caf",
             try std.fmt.allocPrint(
                 allocator,
-                "transparenZ-{s}",
+                "transparenZ-{s}.tar.gz",
                 .{try target.query.zigTriple(allocator)},
             ),
             "-C",
@@ -100,6 +102,6 @@ fn buildTransparenZ(
             ".",
         });
 
-        runTar.step.dependOn(installStep);
+        installStep.dependOn(&runTar.step);
     }
 }
