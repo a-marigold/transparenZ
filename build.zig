@@ -64,8 +64,6 @@ fn buildTransparenZ(
         }),
     });
 
-    b.installArtifact(exe);
-
     installStep.dependOn(
         &b.addInstallArtifact(exe, INSTALL_ARTIFACT_OPTIONS).step,
     );
@@ -91,15 +89,14 @@ fn buildTransparenZ(
     if (isRelease) {
         const runTar = b.addSystemCommand(&.{
             "tar",
-            "-caf",
+            "-cf",
             try std.fmt.allocPrint(
                 allocator,
-                "transparenZ-{s}.tar.gz",
+                "zig-out/transparenZ-{s}.tar",
                 .{try target.query.zigTriple(allocator)},
             ),
-            "-C",
-            "zig-out",
-            ".",
+            "zig-out/transparenZ.exe",
+            "zig-out/ui.dll",
         });
 
         installStep.dependOn(&runTar.step);
