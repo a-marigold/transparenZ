@@ -17,6 +17,9 @@ const INSTALL_ARTIFACT_OPTIONS: Build.Step.InstallArtifact.Options = .{
     .dest_dir = .{ .override = .prefix },
 };
 
+const MAIN_BIN_NAME = "transparenZ";
+const UI_DLL_BIN_NAME = std.fs.path.stem(constants.UI_DLL_FILE_NAME);
+
 pub fn build(b: *Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
@@ -51,7 +54,7 @@ fn buildTransparenZ(
     const installStep = b.getInstallStep();
 
     const exe = b.addExecutable(.{
-        .name = "transparenZ",
+        .name = MAIN_BIN_NAME,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -69,7 +72,7 @@ fn buildTransparenZ(
     );
 
     const uiDll = b.addLibrary(.{
-        .name = std.fs.path.stem(constants.UI_DLL_FILE_NAME),
+        .name = UI_DLL_BIN_NAME,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/ui_dll.zig"),
             .target = target,
@@ -92,12 +95,14 @@ fn buildTransparenZ(
             "-cf",
             try std.fmt.allocPrint(
                 allocator,
-                "zig-out/transparenZ-{s}.tar",
+                "transparenZ-{s}.tar",
                 .{try target.query.zigTriple(allocator)},
             ),
-            "zig-out/transparenZ.exe",
-            "zig-out/ui.dll",
+            MAIN_BIN_NAME ++ ".exe",
+            UI_DLL_BIN_NAME ++ ".dll",
         });
+
+        runTar.setCwd(b.path("zig-out"));
 
         installStep.dependOn(&runTar.step);
     }
