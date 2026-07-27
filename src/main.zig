@@ -1,6 +1,7 @@
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
+const builtin = @import("builtin");
 
 const win = @import("win.zig");
 const constants = @import("constants.zig");
@@ -12,29 +13,33 @@ const UI_DLL_ERRORS = constants.UI_DLL_ERRORS;
 
 const UiDllCode = constants.UiDllCode;
 
-pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    _ = trace;
-    _ = ret_addr;
+pub const panic = std.debug.FullPanic(struct {
+    fn panic(msg: []const u8, first_trace_addr: ?usize) noreturn {
+        @branchHint(.cold);
 
-    // Safe stderr writing without allocations
-
-    if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
-        @branchHint(.likely);
-
-        if (handle != zigWin.INVALID_HANDLE_VALUE) {
-            var writtenBytes: zigWin.DWORD = 0;
-            _ = win.WriteFile(
-                handle,
-                msg.ptr,
-                @intCast(msg.len),
-                &writtenBytes,
-                null,
-            );
+        if (builtin.mode == .Debug) {
+            std.debug.defaultPanic(msg, first_trace_addr);
         }
-    }
 
-    utils.exit(1);
-}
+        // Safe stderr writing without allocations
+        if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
+            @branchHint(.likely);
+
+            if (handle != zigWin.INVALID_HANDLE_VALUE) {
+                var writtenBytes: zigWin.DWORD = 0;
+                _ = win.WriteFile(
+                    handle,
+                    msg.ptr,
+                    @intCast(msg.len),
+                    &writtenBytes,
+                    null,
+                );
+            }
+        }
+
+        utils.exit(1);
+    }
+}.panic);
 
 pub fn main() void {
     const explorerProcess = utils.findProcessByWindowClass(
