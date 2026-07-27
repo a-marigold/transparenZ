@@ -15,6 +15,7 @@ pub const WINDOWS_UI_XAML_DLL_NAME = "Windows.UI.Xaml.dll";
 
 pub const TaskbarElementNames = struct {
     pub const BACKGROUND_FILL = unicode.utf8ToUtf16LeStringLiteral("BackgroundFill");
+
     pub const BACKGROUND_STROKE = unicode.utf8ToUtf16LeStringLiteral("BackgroundStroke");
 };
 
@@ -47,40 +48,55 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
     pub const EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
 };
 
-/// Messages of errors appearing only in the main process.
-pub const MainErrors = struct {
-    pub const OPEN_EXPLORER_FAIL = "Failed to open 'explorer.exe' process.";
-
-    pub const GET_EXE_PATH_FAIL = "Failed to get path to the 'transparenZ' executable.";
-
-    pub const ALLOC_UI_DLL_FILE_NAME_FAIL = "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' path string in explorer.exe.";
-
-    pub const WAIT_UI_DLL_FAIL = "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
-
-    pub const UI_DLL_CODE_EVENT_CREATION_FAILED = "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
-};
-
-/// Array with error messages appearing only in `ui.dll`.
+/// Error messages of main process and `ui.dll`.
 ///
-/// Indexes of this array are codes of `UiDllCode`.
-///
-/// That is, to access, for example, message of `InitXamlDiagsFail`, do `UI_DLL_ERRORS[UiDllCode.InitXamlDiagsFail]`.
-///
-/// `UI_DLL_ERRORS[UiDllCode.Success]` causes undefined behavior 'cause `UiDllCode.Success` index of this array is not filled.
-pub const UI_DLL_ERRORS = block: {
-    var errors: [@typeInfo(UiDllCode).@"enum".field_values.len][:0]const u8 = undefined;
+/// Main errors are in a struct 'cause they are accessed directly at known positions in code, but `ui.dll` errors are in an array 'cause they are accessed by dynamic indexes (see how `main` handles them).
+pub const Errors = struct {
+    /// Messages of errors appearing only in the main process.
+    pub const Main = struct {
+        pub const OPEN_EXPLORER_FAIL =
+            "Failed to open 'explorer.exe' process.";
 
-    errors[@intFromEnum(UiDllCode.GetExePathFail)] = "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+        pub const GET_EXE_PATH_FAIL =
+            "Failed to get path to the 'transparenZ' executable.";
 
-    errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] = "Failed to initialize XAML diagnostics.";
+        pub const ALLOC_UI_DLL_FILE_NAME_FAIL =
+            "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' path string in explorer.exe.";
 
-    errors[@intFromEnum(UiDllCode.RegisterTreeServiceCallbackFail)] = "Failed to register tree service callback.";
+        pub const CREATE_UI_DLL_CODE_EVENT_FAIL =
+            "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
 
-    errors[@intFromEnum(UiDllCode.GetIShapeInCallbackFail)] = "Failed to get 'IShape' interface inside tree service callback.";
+        pub const WAIT_UI_DLL_CODE_EVENTS_FAIL =
+            "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
+    };
 
-    errors[@intFromEnum(UiDllCode.IXamlDiagnosticsNullInCallback)] = "'IXamlDiagnostics' unexpectedly equals 'null' in tree service callback.";
+    /// Array with error messages appearing only in `ui.dll`.
+    ///
+    /// Indexes of this array are codes of `UiDllCode`.
+    ///
+    /// That is, to access, for example, message of `InitXamlDiagsFail`, do `UI_DLL_ERRORS[UiDllCode.InitXamlDiagsFail]`.
+    ///
+    /// `UI_DLL_ERRORS[UiDllCode.Success]` causes undefined behavior 'cause `UiDllCode.Success` index of this array is not filled.
+    pub const UI_DLL = block: {
+        var errors: [@typeInfo(UiDllCode).@"enum".field_values.len][:0]const u8 = undefined;
 
-    break :block errors;
+        errors[@intFromEnum(UiDllCode.GetExePathFail)] =
+            "Failed to get path to the '" ++ UI_DLL_FILE_NAME ++ "' executable.";
+
+        errors[@intFromEnum(UiDllCode.InitXamlDiagsFail)] =
+            "Failed to initialize XAML diagnostics.";
+
+        errors[@intFromEnum(UiDllCode.RegisterTreeServiceCallbackFail)] =
+            "Failed to register tree service callback.";
+
+        errors[@intFromEnum(UiDllCode.GetIShapeInCallbackFail)] =
+            "Failed to get 'IShape' interface inside tree service callback.";
+
+        errors[@intFromEnum(UiDllCode.IXamlDiagnosticsNullInCallback)] =
+            "'IXamlDiagnostics' unexpectedly equals 'null' in tree service callback.";
+
+        break :block errors;
+    };
 };
 
 /// Contains numbers from 0 to `quantity` converted to UTF-16.

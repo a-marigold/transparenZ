@@ -8,8 +8,7 @@ const constants = @import("constants.zig");
 
 const utils = @import("utils.zig");
 
-const MainErrors = constants.MainErrors;
-const UI_DLL_ERRORS = constants.UI_DLL_ERRORS;
+const Errors = constants.Errors;
 
 const UiDllCode = constants.UiDllCode;
 
@@ -48,7 +47,7 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic(MainErrors.OPEN_EXPLORER_FAIL);
+        @panic(Errors.Main.OPEN_EXPLORER_FAIL);
     };
 
     const uiDllPath: [:0]u16 = block: {
@@ -57,7 +56,7 @@ pub fn main() void {
         const exePath = utils.getExePath(null, &buffer) orelse {
             @branchHint(.cold);
 
-            @panic(MainErrors.GET_EXE_PATH_FAIL);
+            @panic(Errors.Main.GET_EXE_PATH_FAIL);
         };
 
         const exeDirName = utils.getDirPath(exePath);
@@ -78,7 +77,7 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic(MainErrors.ALLOC_UI_DLL_FILE_NAME_FAIL);
+        @panic(Errors.Main.ALLOC_UI_DLL_FILE_NAME_FAIL);
     };
 
     const loadLibraryW = win.GetProcAddress(
@@ -99,7 +98,7 @@ pub fn main() void {
     ) orelse {
         @branchHint(.cold);
 
-        @panic(MainErrors.UI_DLL_CODE_EVENT_CREATION_FAILED);
+        @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
 
     _ = utils.createRemoteThread(
@@ -115,10 +114,10 @@ pub fn main() void {
         &comptime utils.getRuntimeEnumValues(UiDllCodeValues, UiDllCodeInfo.tag_type),
         win.INFINITE,
     ) catch {
-        @panic(MainErrors.WAIT_UI_DLL_FAIL);
+        @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
     };
 
     if (eventUiDllCode != @intFromEnum(UiDllCode.Success)) {
-        @panic(UI_DLL_ERRORS[eventUiDllCode]);
+        @panic(Errors.UI_DLL[eventUiDllCode]);
     }
 }
