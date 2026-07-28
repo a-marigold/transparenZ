@@ -77,11 +77,12 @@ pub var taskbarHook: TaskbarHook = .{
             ) callconv(.winapi) win.HRESULT {
                 _ = riid;
 
-                ppvSite.* = @as(*TaskbarHook, @ptrCast(self)).iXamlDiagnostics;
+                ppvSite.* = @as(*TaskbarHook, @ptrCast(@alignCast(self))).iXamlDiagnostics;
 
                 return .S_OK;
             }
         }.GetSite,
     },
+
     .iXamlDiagnostics = null,
 };

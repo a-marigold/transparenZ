@@ -35,10 +35,20 @@ pub fn build(b: *Build) !void {
 
     if (isRelease) {
         inline for (TARGETS) |target| {
-            try buildTransparenZ(b, b.resolveTargetQuery(target), optimize, true);
+            try buildTransparenZ(
+                b,
+                b.resolveTargetQuery(target),
+                optimize,
+                true,
+            );
         }
     } else {
-        try buildTransparenZ(b, b.standardTargetOptions(.{}), optimize, false);
+        try buildTransparenZ(
+            b,
+            b.standardTargetOptions(.{}),
+            optimize,
+            false,
+        );
     }
 }
 
@@ -63,7 +73,7 @@ fn buildTransparenZ(
             .strip = isRelease,
             .error_tracing = !isRelease,
             .omit_frame_pointer = isRelease,
-            .unwind_tables = if (isRelease) .none else null,
+            .unwind_tables = if (isRelease) .none else .sync,
         }),
     });
 
@@ -82,6 +92,7 @@ fn buildTransparenZ(
             .omit_frame_pointer = isRelease,
             .unwind_tables = if (isRelease) .none else null,
         }),
+
         .linkage = .dynamic,
     });
 

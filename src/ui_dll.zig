@@ -81,11 +81,11 @@ fn init(
         win.LOAD_LIBRARY_SEARCH_SYSTEM32,
     );
 
-    const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx = @ptrCast(win.GetProcAddress(
-        winUiXamlDll,
-
-        "InitializeXamlDiagnosticsEx",
-    ));
+    const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx =
+        @ptrCast(@alignCast(win.GetProcAddress(
+            winUiXamlDll,
+            "InitializeXamlDiagnosticsEx",
+        )));
 
     const uiDllPath = block: {
         var buffer: [zigWin.MAX_PATH:0]u16 = undefined;
@@ -150,9 +150,9 @@ fn init(
     routineContext.tapClsid = &TaskbarHook.TASKBAR_HOOK_GUID;
 
     // Name of diagnostics must be unique in the whole system.
+
     // Start with 10, 'cause if start with 0-9 numbers, there is an unused whitespace or unstable length
     var diagsName: [5:0]u16 = ("tZy" ++ constants.UTF16_NUMBERS[10]).*;
-
     const maxAttemptCount = 60;
     const attemptInterval = 600;
 
@@ -237,7 +237,7 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
 
                 return .E_NOINTERFACE;
             }
-        },
+        }.QueryInterface,
 
         .AddRef = win.IUnknownNoOpMethods.AddRef,
         .Release = win.IUnknownNoOpMethods.Release,
@@ -253,11 +253,11 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
                 _ = relation;
 
                 if (mutationType == .Add) {
-                    if (std.mem.eql(u16, element.Name, TaskbarElementNames.BACKGROUND_FILL)) {
+                    if (utils.compareNullTermPtrs(u16, element.Name, TaskbarElementNames.BACKGROUND_FILL)) {
                         if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
                             const backgroundFill = getInspectableFromHandle(
                                 win.IShape,
-                                win.IID_IShape,
+                                &win.IID_IShape,
                                 element.Handle,
                                 iXamlDiagnostics,
                             ) orelse {
@@ -266,9 +266,9 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
                                 return .E_FAIL;
                             };
 
-                            backgroundFill.vtable.put_Fill(null);
+                            _ = backgroundFill.vtable.put_Fill(backgroundFill, null);
                         } else {
-                            setUiDllCodeEvent(.IXamlDiagnosticsNullInTreeServiceCallback);
+                            setUiDllCodeEvent(.IXamlDiagnosticsNullInCallback);
 
                             return .E_FAIL;
                         }
@@ -305,7 +305,7 @@ fn registerVisualTreeServiceCallback(
 inline fn getInspectableFromHandle(
     comptime T: type,
     /// `GUID` of `T`.
-    comptime TGuid: zigWin.GUID,
+    comptime TGuid: *const zigWin.GUID,
     handle: win.InstanceHandle,
     /// `IXamlDiagnostics` for methods that help to get inspectable.
     iXamlDiagnostics: *win.IXamlDiagnostics,
@@ -321,9 +321,9 @@ inline fn getInspectableFromHandle(
         if (inspectable.vtable.QueryInterface(
             inspectable,
             TGuid,
-            &inspectablePointer,
+            @ptrCast(&inspectablePointer),
         ) == .S_OK) {
-            return inspectablePointer;
+            return @ptrCast(inspectablePointer);
         }
     }
 

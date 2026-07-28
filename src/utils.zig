@@ -221,16 +221,15 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 /// };
 /// const letterValues = @typeInfo(Letter).@"enum".field_values;
 ///
-/// const events = createEventsFromEnum(letterValues, "Local\\\\Letter", win.EVENT_ALL_ACCESS);
+/// const events = createEventsFromEnum(letterValues, "Local\\Letter", win.EVENT_ALL_ACCESS);
 ///
-/// // Created 'Local\\LetterA', 'Local\\LetterB', 'Local\\LetterC'
-///
+/// // Created 'Local\LetterA', 'Local\LetterB', 'Local\LetterC'
 /// // `events[0]` is `Letter.A`, `events[1]` is `Letter.B` and so on
 /// ```
 pub fn createEventsFromEnum(
     /// `field_values` of an `Enum`.
     comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
-    /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    /// Must be at least `'Local\'` or `'Global\'`, but not empty.
     comptime namePrefix: []const u8,
     /// To be passed to `CreateEventExW`.
     dwFlags: zigWin.DWORD,
@@ -252,6 +251,15 @@ pub fn createEventsFromEnum(
         } else {
             @branchHint(.cold);
 
+            std.debug.print(
+                \\ index   {}
+                \\ errcode {}
+                \\
+            , .{
+                index,
+                zigWin.GetLastError(),
+            });
+
             return null;
         }
     }
@@ -265,7 +273,7 @@ pub fn createEventsFromEnum(
 ///
 /// Returns `BOOL` indicating success or fail.
 pub inline fn setEventOfEnum(
-    /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    /// Must be at least `'Local\'` or `'Global\'`, but not empty.
     comptime namePrefix: []const u8,
     comptime EnumValue: comptime_int,
     /// To be passed to `OpenEventW`.
@@ -327,7 +335,7 @@ pub inline fn waitAnyEventOfEnum(
 ///
 /// Returns `namePrefix ++ EnumValue`.
 fn getEventNameOfEnumValue(
-    /// Must be at least `'Local\\\\'` or `'Global\\\\'`, but not empty.
+    /// Must be at least `'Local\'` or `'Global\'`, but not empty.
     comptime namePrefix: []const u8,
     comptime EnumValue: comptime_int,
 ) [:0]const u16 {

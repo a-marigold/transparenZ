@@ -31,7 +31,7 @@ pub const TaskbarElementNames = struct {
 ///
 /// Example of how event names combined:
 ///
-/// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\\\\SomePrefix1"`.
+/// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\SomePrefix1"`.
 pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI_DLL_ERRORS` array
     Success,
 
@@ -42,7 +42,7 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
     IXamlDiagnosticsNullInCallback,
 
     /// See `UiDllCode`.
-    pub const EVENT_NAME_PREFIX = "Local\\\\tZyC";
+    pub const EVENT_NAME_PREFIX = "Local\\tZyC";
 
     /// Desired access of events created from `UiDllCode` enum.
     pub const EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
@@ -50,7 +50,8 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
 
 /// Error messages of main process and `ui.dll`.
 ///
-/// Main errors are in a struct 'cause they are accessed directly at known positions in code, but `ui.dll` errors are in an array 'cause they are accessed by dynamic indexes (see how `main` handles them).
+/// Main errors are in a struct 'cause they are accessed directly at known positions in code,
+/// but `ui.dll` errors are in an array 'cause they are accessed by dynamic indexes (see how `main` handles them).
 pub const Errors = struct {
     /// Messages of errors appearing only in the main process.
     pub const Main = struct {
@@ -112,7 +113,6 @@ pub const UTF16_NUMBERS = block: {
     @setEvalBranchQuota(100_000);
 
     const quantity = 16;
-
     var numbers: [quantity][:0]const u16 = undefined;
 
     var number = 0;
