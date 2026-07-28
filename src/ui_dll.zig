@@ -154,7 +154,7 @@ fn init(
     // Start with 10, 'cause if start with 0-9 numbers, there is an unused whitespace or unstable length
     var diagsName: [5:0]u16 = ("tZy" ++ constants.UTF16_NUMBERS[10]).*;
     const maxAttemptCount = 60;
-    const attemptInterval = 600;
+    const attemptInterval = comptime constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS / maxAttemptCount;
 
     var attemptCount: u32 = 0;
 

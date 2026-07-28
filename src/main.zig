@@ -113,7 +113,7 @@ pub fn main() void {
         &uiDllCodeEvents,
         &comptime utils.getRuntimeEnumValues(UiDllCodeValues, UiDllCodeInfo.tag_type),
 
-        win.INFINITE,
+        comptime constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS + 6000,
     ) orelse {
         @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
     };

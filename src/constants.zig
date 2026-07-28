@@ -19,6 +19,12 @@ pub const TaskbarElementNames = struct {
     pub const BACKGROUND_STROKE = unicode.utf8ToUtf16LeStringLiteral("BackgroundStroke");
 };
 
+/// `InitializeXamlDiagnosticsEx` may fail when `explorer.exe` is loading or system has just waken up,
+/// so `ui.dll` makes multiple attempts during 30 (value of this constant) seconds.
+///
+/// This is the maximum time `ui.dll` can be initializing.
+pub const STYLE_TASKBAR_ATTEMPTS_TIME_MS = 30_000;
+
 /// Used to share successfull completion of taskbar styling or an error from `ui.dll` to main process.
 ///
 /// Main process creates events via `CreateEventExW`

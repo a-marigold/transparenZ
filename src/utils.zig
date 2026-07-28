@@ -251,15 +251,6 @@ pub fn createEventsFromEnum(
         } else {
             @branchHint(.cold);
 
-            std.debug.print(
-                \\ index   {}
-                \\ errcode {}
-                \\
-            , .{
-                index,
-                zigWin.GetLastError(),
-            });
-
             return null;
         }
     }
