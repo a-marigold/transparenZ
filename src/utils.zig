@@ -111,37 +111,6 @@ pub fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAccess
     );
 }
 
-/// Allocates memory in process of `processHandler` and then writes `data` there.
-///
-/// Returns start address of allocated memory or `null` in case of error.
-pub fn allocWriteProcessMemory(
-    data: *const anyopaque,
-    /// Size in bytes
-    size: zigWin.SIZE_T,
-    processHandle: zigWin.HANDLE,
-) ?zigWin.LPVOID {
-    const startAddress = win.VirtualAllocEx(
-        processHandle,
-        null,
-        size,
-        win.MEM_RESERVE | win.MEM_COMMIT,
-        win.PAGE_READWRITE,
-    ) orelse {
-        return null;
-    };
-    if (win.WriteProcessMemory(
-        processHandle,
-        startAddress,
-        data,
-        size,
-        null,
-    ) == win.FALSE) {
-        return null;
-    }
-
-    return startAddress;
-}
-
 /// Allocates `size` amount of bytes in remote `process`.
 pub inline fn allocRemoteMemory(
     process: zigWin.HANDLE,
@@ -157,13 +126,30 @@ pub inline fn allocRemoteMemory(
     );
 }
 
+/// Completely frees `process` memory, that is, after freeing,
+/// the memory is not reserved and does not belong to `process`.
+pub inline fn freeRemoteMemory(
+    process: zigWin.HANDLE,
+    /// Address of process address space.
+    address: *anyopaque,
+    /// Size in bytes.
+    size: usize,
+) void {
+    _ = win.VirtualFreeEx(
+        process,
+        address,
+        size,
+        win.MEM_RELEASE,
+    );
+}
+
 /// Writes `size` amount of `data` to `address` in memory of `process`.
 ///
-/// `address` is from address space of `process`.
 pub inline fn writeRemoteMemory(
     process: zigWin.HANDLE,
+    /// Address from address space of `process`.
     address: *anyopaque,
-    data: *anyopaque,
+    data: *const anyopaque,
     /// Size in bytes.
     size: usize,
 ) ?void {
