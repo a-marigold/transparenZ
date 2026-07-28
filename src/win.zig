@@ -29,6 +29,8 @@ pub const PAGE_READWRITE = 0x04;
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
 pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;
 
+pub const WM_CLOSE: zigWin.UINT = 0x0010;
+
 pub const HRESULT = enum(zigWin.DWORD) {
     S_OK = 0x00000000,
     E_NOTIMPL = 0x80004001,
@@ -54,6 +56,7 @@ pub const LOAD_LIBRARY_SEARCH_SYSTEM32: zigWin.DWORD = 0x00000800;
 pub const LOAD_LIBRARY_AS_DATAFILE: zigWin.DWORD = 0x00000002;
 
 pub const SYNCHRONIZE: zigWin.DWORD = 0x00100000;
+
 pub const EVENT_MODIFY_STATE: zigWin.DWORD = 0x0002;
 
 pub const InstanceHandle = u32;
@@ -112,18 +115,6 @@ pub const IObjectWithSite = extern struct {
         GetSite: *const fn (self: *anyopaque, riid: *const zigWin.GUID, ppvSite: *?*anyopaque) callconv(.winapi) HRESULT,
     };
 };
-
-pub const IInspectable = extern struct {
-    vtable: *const VTable,
-    pub const VTable = extern struct {
-        QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
-        AddRef: @FieldType(IUnknown.VTable, "AddRef"),
-        Release: @FieldType(IUnknown.VTable, "Release"),
-        GetIids: *anyopaque,
-        GetRuntimeClassName: *anyopaque,
-        GetTrustLevel: *anyopaque,
-    };
-};
 pub const IXamlDiagnostics = extern struct {
     vtable: *const VTable,
     pub const VTable = extern struct {
@@ -139,11 +130,24 @@ pub const IXamlDiagnostics = extern struct {
         GetInitializationData: *anyopaque,
     };
 };
+
 pub const IID_IXamlDiagnostics = zigWin.GUID{
     .Data1 = 0x18c9e2b6,
     .Data2 = 0x3c43,
     .Data3 = 0x4116,
     .Data4 = .{ 0x9f, 0x2b, 0xff, 0x93, 0x5d, 0x77, 0x70, 0xd2 },
+};
+
+pub const IInspectable = extern struct {
+    vtable: *const VTable,
+    pub const VTable = extern struct {
+        QueryInterface: @FieldType(IUnknown.VTable, "QueryInterface"),
+        AddRef: @FieldType(IUnknown.VTable, "AddRef"),
+        Release: @FieldType(IUnknown.VTable, "Release"),
+        GetIids: *anyopaque,
+        GetRuntimeClassName: *anyopaque,
+        GetTrustLevel: *anyopaque,
+    };
 };
 
 pub const VisualElement = extern struct {
@@ -250,6 +254,7 @@ pub const IID_IShape: zigWin.GUID = .{
     .Data3 = 0x454D,
     .Data4 = .{ 0xAE, 0x06, 0xA2, 0x46, 0x6E, 0x37, 0xC8, 0x32 },
 };
+
 // const ISolidColorBrush = struct {
 //     vtable: *const VTable,
 //     pub const VTable = struct {
@@ -410,3 +415,19 @@ pub extern "kernel32" fn WaitForMultipleObjects(
 ) callconv(.winapi) zigWin.DWORD;
 
 pub extern "kernel32" fn Sleep(dwMilliseconds: zigWin.DWORD) callconv(.winapi) void;
+
+pub extern "kernel32" fn OutputDebugStringW(
+    lpOutputString: zigWin.LPCWSTR,
+) callconv(.winapi) void;
+
+pub extern "user32" fn PostMessageW(
+    hWnd: zigWin.HWND,
+    Msg: zigWin.UINT,
+    wParam: WPARAM,
+    lParam: LPARAM,
+) callconv(.winapi) BOOL;
+
+pub extern "kernel32" fn GetExitCodeThread(
+    hThread: zigWin.HANDLE,
+    lpExitCode: zigWin.LPDWORD,
+) callconv(.winapi) BOOL;

@@ -68,23 +68,6 @@ pub fn main() void {
         );
     };
 
-    const uiDllPathSizeWithNullTerminator = uiDllPath.len * @sizeOf(zigWin.WCHAR);
-
-    const uiDllPathStartAddress = utils.allocWriteProcessMemory(
-        uiDllPath.ptr,
-        uiDllPathSizeWithNullTerminator,
-        explorerProcess,
-    ) orelse {
-        @branchHint(.cold);
-
-        @panic(Errors.Main.ALLOC_UI_DLL_FILE_NAME_FAIL);
-    };
-
-    const loadLibraryW = win.GetProcAddress(
-        win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
-        "LoadLibraryW",
-    );
-
     const UiDllCodeInfo = @typeInfo(UiDllCode).@"enum";
 
     const UiDllCodeValues = UiDllCodeInfo.field_values;
@@ -101,11 +84,7 @@ pub fn main() void {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
 
-    _ = utils.createRemoteThread(
-        explorerProcess,
-        @ptrCast(@alignCast(loadLibraryW)),
-        uiDllPathStartAddress,
-    );
+    _ = injectDll(explorerProcess, uiDllPath);
 
     const eventUiDllCode = utils.waitAnyEventOfEnum(
         UiDllCodeInfo.tag_type,
@@ -121,4 +100,43 @@ pub fn main() void {
     if (eventUiDllCode != @intFromEnum(UiDllCode.Success)) {
         @panic(Errors.UI_DLL[eventUiDllCode]);
     }
+}
+
+const InjectDllError = error{
+    AllocDllPathFail,
+    CreateRemoteThreadFail,
+};
+
+/// Injects DLL from `dllPath` to `process`.
+///
+/// Returns handle of remote `process` thread which executes `LoadLibraryW` to be waited or used in any way
+/// or `InjectDllError` in case of error.
+inline fn injectDll(process: zigWin.HANDLE, dllPath: [:0]const u16) InjectDllError!zigWin.HMODULE {
+    const dllPathWithNullTerm = dllPath.len + 1;
+
+    const dllPathAddress = utils.allocWriteProcessMemory(
+        dllPath,
+        dllPathWithNullTerm * @sizeOf(u16),
+        process,
+    ) orelse {
+        @branchHint(.cold);
+
+        return InjectDllError.AllocDllPathFail;
+    };
+
+    const loadLibrary = win.GetProcAddress(
+        win.GetModuleHandleW("kernel32.dll"),
+
+        "LoadLibraryW",
+    );
+
+    const thread = utils.createRemoteThread(
+        process,
+        @ptrCast(loadLibrary),
+        dllPathAddress,
+    ) orelse {
+        return InjectDllError.CreateRemoteThreadFail;
+    };
+
+    return thread;
 }
