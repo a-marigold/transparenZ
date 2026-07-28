@@ -263,6 +263,7 @@ pub fn createEventsFromEnum(
             return null;
         }
     }
+
     return events;
 }
 
@@ -296,14 +297,9 @@ pub inline fn setEventOfEnum(
     }
 }
 
-const WaitEventOfEnumError = error{
-    WaitFail,
-    WaitTimeout,
-};
-
 /// Waits for `events` via `WaitForMultipleObjects`.
 ///
-/// Returns value of enum, event of which `WaitForMultipleObjects` returned or `WaitEventOfEnumError`.
+/// Returns value of enum, event of which `WaitForMultipleObjects` returned, or `null` in case of error.
 pub inline fn waitAnyEventOfEnum(
     comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
     comptime enumValuesLen: u64,
@@ -313,17 +309,12 @@ pub inline fn waitAnyEventOfEnum(
     enumValues: *const [enumValuesLen]TagType,
     /// Time in milliseconds
     timeoutMs: u32,
-) WaitEventOfEnumError!TagType {
+) ?TagType {
     const waitResult = win.WaitForMultipleObjects(events.len, events, win.FALSE, timeoutMs);
 
-    if (waitResult == win.WAIT_FAILED) {
-        @branchHint(.cold);
-
-        return WaitEventOfEnumError.WaitFail;
-    } else if (waitResult == win.WAIT_TIMEOUT) {
-        @branchHint(.cold);
-
-        return WaitEventOfEnumError.WaitTimeout;
+    // `WAIT_TIMEOUT` and `WAIT_FAILED` are in out of `enumValuesLen` range
+    if (waitResult >= comptime enumValuesLen + win.WAIT_OBJECT_0) {
+        return null;
     }
 
     const eventIndex = waitResult - win.WAIT_OBJECT_0;

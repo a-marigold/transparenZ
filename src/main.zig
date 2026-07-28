@@ -112,8 +112,9 @@ pub fn main() void {
         UiDllCodeValues.len,
         &uiDllCodeEvents,
         &comptime utils.getRuntimeEnumValues(UiDllCodeValues, UiDllCodeInfo.tag_type),
+
         win.INFINITE,
-    ) catch {
+    ) orelse {
         @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
     };
 
