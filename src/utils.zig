@@ -142,6 +142,42 @@ pub fn allocWriteProcessMemory(
     return startAddress;
 }
 
+/// Allocates `size` amount of bytes in remote `process`.
+pub inline fn allocRemoteMemory(
+    process: zigWin.HANDLE,
+    /// Size in bytes.
+    size: usize,
+) ?*anyopaque {
+    return win.VirtualAllocEx(
+        process,
+        null,
+        size,
+        win.MEM_RESERVE | win.MEM_COMMIT,
+        win.PAGE_READWRITE,
+    );
+}
+
+/// Writes `size` amount of `data` to `address` in memory of `process`.
+///
+/// `address` is from address space of `process`.
+pub inline fn writeRemoteMemory(
+    process: zigWin.HANDLE,
+    address: *anyopaque,
+    data: *anyopaque,
+    /// Size in bytes.
+    size: usize,
+) ?void {
+    if (win.WriteProcessMemory(
+        process,
+        address,
+        data,
+        size,
+        null,
+    ) == win.FALSE) {
+        return null;
+    }
+}
+
 const ThreadRoutine = fn (routineArg: ?*anyopaque) callconv(.winapi) ThreadReturnValue;
 
 pub const ThreadReturnValue = enum(zigWin.DWORD) {

@@ -73,6 +73,7 @@ pub fn main() void {
     const UiDllCodeValues = UiDllCodeInfo.field_values;
 
     // Create events before injection
+
     const uiDllCodeEvents = utils.createEventsFromEnum(
         UiDllCodeValues,
         UiDllCode.EVENT_NAME_PREFIX,
@@ -91,7 +92,6 @@ pub fn main() void {
         UiDllCodeValues.len,
         &uiDllCodeEvents,
         &comptime utils.getRuntimeEnumValues(UiDllCodeValues, UiDllCodeInfo.tag_type),
-
         comptime constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS + 6000,
     ) orelse {
         @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
@@ -109,18 +109,22 @@ const InjectDllError = error{
 
 /// Injects DLL from `dllPath` to `process`.
 ///
-/// Returns handle of remote `process` thread which executes `LoadLibraryW` to be waited or used in any way
-/// or `InjectDllError` in case of error.
+/// Returns handle of remote `process` thread which executes `LoadLibraryW`
+/// to be waited or used in any way or `InjectDllError` in case of error.
 inline fn injectDll(process: zigWin.HANDLE, dllPath: [:0]const u16) InjectDllError!zigWin.HMODULE {
     const dllPathWithNullTerm = dllPath.len + 1;
-
-    const dllPathAddress = utils.allocWriteProcessMemory(
+    const dllPathAddress = utils.allocRemoteMemory(
+        process,
+        dllPathWithNullTerm * @sizeOf(u16),
+    ) orelse {
+        return InjectDllError.AllocDllPathFail;
+    };
+    utils.writeRemoteMemory(
+        process,
+        dllPathAddress,
         dllPath,
         dllPathWithNullTerm * @sizeOf(u16),
-        process,
     ) orelse {
-        @branchHint(.cold);
-
         return InjectDllError.AllocDllPathFail;
     };
 
