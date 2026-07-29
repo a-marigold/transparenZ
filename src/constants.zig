@@ -67,8 +67,11 @@ pub const Errors = struct {
         pub const GET_EXE_PATH_FAIL =
             "Failed to get path to the 'transparenZ' executable.";
 
-        pub const ALLOC_UI_DLL_FILE_NAME_FAIL =
-            "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' path string in explorer.exe.";
+        pub const ALLOC_UI_DLL_PATH_FAIL =
+            "Failed to allocate '" ++ UI_DLL_FILE_NAME ++ "' path string in 'explorer.exe'.";
+
+        pub const INJECT_UI_DLL_FAIL =
+            "Failed to inject '" ++ UI_DLL_FILE_NAME ++ "' to 'explorer.exe.'";
 
         pub const CREATE_UI_DLL_CODE_EVENT_FAIL =
             "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
@@ -111,7 +114,6 @@ pub const Errors = struct {
 /// Used not to convert numbers to UTF-16 in runtime.
 ///
 /// `quantity` is increased on demand.
-///
 /// That is, when a part of application using this array needs more numbers, it exapnds the array.
 ///
 /// For example, to convert 16 to UTF-16, use `UTF16_NUMBERS[16]`.
