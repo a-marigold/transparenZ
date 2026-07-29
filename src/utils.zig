@@ -364,3 +364,40 @@ pub fn getRuntimeEnumValues(
     }
     return runtimeValues;
 }
+
+const FileMapping = struct {
+    /// Handle of mapping.
+    handle: zigWin.HANDLE,
+
+    /// Address of mapped memory in the address space of process.
+    address: *anyopaque,
+
+    pub fn init(name: []const u16, protectFlags: u32) ?FileMapping {
+        const mapping = win.CreateFileMappingW(
+            win.INVALID_HANDLE_VALUE,
+            null,
+            protectFlags,
+            0,
+            0,
+            name,
+        ) orelse {
+            return null;
+        };
+
+        const address = win.MapViewOfFile(
+            mapping,
+            protectFlags,
+            0,
+            0,
+            0,
+            null,
+        ) orelse {
+            return null;
+        };
+
+        return .{
+            .handle = mapping,
+            .address = address,
+        };
+    }
+};

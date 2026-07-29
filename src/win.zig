@@ -18,6 +18,8 @@ pub const LPARAM = WPARAM;
 
 pub const STD_ERROR_HANDLE: zigWin.DWORD = @bitCast(@as(i32, -12));
 
+pub const INVALID_HANDLE_VALUE = 0xFFFFFFFFFFFFFFFF;
+
 pub const PROCESS_CREATE_THREAD = 0x0002;
 pub const PROCESS_VM_OPERATION = 0x0008;
 pub const PROCESS_VM_WRITE = 0x0020;
@@ -327,6 +329,30 @@ pub extern "user32" fn FindWindowExW(
     lpClassName: zigWin.LPCWSTR,
     lpWindowName: ?zigWin.LPCWSTR,
 ) callconv(.winapi) ?zigWin.HWND;
+
+pub extern "kernel32" fn CreateFileMappingW(
+    hFile: zigWin.HANDLE,
+    lpFileMappingAttributes: ?*zigWin.SECURITY_ATTRIBUTES,
+    flProtect: zigWin.DWORD,
+    dwMaximumSizeHigh: zigWin.DWORD,
+    dwMaximumSizeLow: zigWin.DWORD,
+    lpName: zigWin.LPCWSTR,
+) callconv(.winapi) ?zigWin.HANDLE;
+
+pub extern "kernel32" fn OpenFileMappingW(
+    dwDesiredAccess: zigWin.DWORD,
+    bInheritHandle: zigWin.BOOL,
+    lpName: zigWin.LPCWSTR,
+) callconv(.winapi) ?zigWin.HANDLE;
+
+pub extern "kernel32" fn MapViewOfFile(
+    hFileMappingObject: zigWin.HANDLE,
+    dwDesiredAccess: zigWin.DWORD,
+    dwFileOffsetHigh: zigWin.DWORD,
+    dwFileOffsetLow: zigWin.DWORD,
+    dwNumberOfBytesToMap: zigWin.SIZE_T,
+    lpBaseAddress: zigWin.LPVOID,
+) callconv(.winapi) ?*anyopaque;
 
 pub extern "kernel32" fn CreateEventExW(
     lpEventAttributes: ?*zigWin.SECURITY_ATTRIBUTES,
