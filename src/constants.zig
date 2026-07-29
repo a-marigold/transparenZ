@@ -3,7 +3,6 @@ const unicode = std.unicode;
 const zigWin = std.os.windows;
 
 const win = @import("win.zig");
-
 const utils = @import("utils.zig");
 
 pub const UI_DLL_FILE_NAME = "ui.dll";
@@ -15,7 +14,6 @@ pub const WINDOWS_UI_XAML_DLL_NAME = "Windows.UI.Xaml.dll";
 
 pub const TaskbarElementNames = struct {
     pub const BACKGROUND_FILL = unicode.utf8ToUtf16LeStringLiteral("BackgroundFill");
-
     pub const BACKGROUND_STROKE = unicode.utf8ToUtf16LeStringLiteral("BackgroundStroke");
 };
 
@@ -27,17 +25,12 @@ pub const STYLE_TASKBAR_ATTEMPTS_TIME_MS = 30_000;
 
 /// Used to share successfull completion of taskbar styling or an error from `ui.dll` to main process.
 ///
-/// Main process creates events via `CreateEventExW`
-/// with prefix `UiDllCode.EVENT_NAME_PREFIX` for every variant of this enumiration.
 ///
-/// When taskbar is succesfully styled or an error appears,
-/// `ui.dll` calls `SetEvent` with corresponding event name.
 ///
-/// `ui.dll` **must** set `UiDllCode.Success` if it ended successfully.
+/// `ui.dll` writes a `UiDllCode` to `UiDllCode.FILE_MAPPING_NAME` mapping
+/// and then signals `SYNC_EVENT_NAME` event to wake up the main process.
 ///
-/// Example of how event names combined:
-///
-/// `UiDllCode.EVENT_PREFIX` ++ `UiDllCode.ErrorName` == `"Local\SomePrefix1"`.
+/// The main process waits for `UiDllCode.SYNC_EVENT_NAME` event.
 pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI_DLL_ERRORS` array
     Success,
 
@@ -50,8 +43,14 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
     /// See `UiDllCode`.
     pub const EVENT_NAME_PREFIX = "Local\\tZyC";
 
-    /// Desired access of events created from `UiDllCode` enum.
-    pub const EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
+    /// Name of file mapping created by the main process.
+    pub const FILE_MAPPING_NAME = "Local\\tZyM";
+
+    /// Name of event created by the main process.
+    pub const SYNC_EVENT_NAME = "Local\\tZyE";
+
+    /// `dwDesitedAccess` of `CreateEvent` and `OpenEvent` function that create the `ui.dll` sync event.
+    pub const SYNC_EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
 };
 
 /// Error messages of main process and `ui.dll`.
@@ -74,7 +73,7 @@ pub const Errors = struct {
             "Failed to inject '" ++ UI_DLL_FILE_NAME ++ "' to 'explorer.exe.'";
 
         pub const CREATE_UI_DLL_CODE_EVENT_FAIL =
-            "Failed to create event for '" ++ UI_DLL_FILE_NAME ++ "' code.";
+            "Failed to create sync event for '" ++ UI_DLL_FILE_NAME ++ "'.";
 
         pub const WAIT_UI_DLL_CODE_EVENTS_FAIL =
             "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
@@ -120,6 +119,7 @@ pub const Errors = struct {
 pub const UTF16_NUMBERS = block: {
     @setEvalBranchQuota(100_000);
 
+    // TODO: fix quantity
     const quantity = 16;
     var numbers: [quantity][:0]const u16 = undefined;
 

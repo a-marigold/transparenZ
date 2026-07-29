@@ -5,12 +5,13 @@ const builtin = @import("builtin");
 
 const win = @import("win.zig");
 const constants = @import("constants.zig");
-
 const utils = @import("utils.zig");
 
 const Errors = constants.Errors;
 
 const UiDllCode = constants.UiDllCode;
+
+const FileMapping = utils.FileMapping;
 
 pub const panic = std.debug.FullPanic(struct {
     fn panic(msg: []const u8, first_trace_addr: ?usize) noreturn {
@@ -93,20 +94,18 @@ pub fn main() void {
         @panic(Errors.Main.ALLOC_UI_DLL_PATH_FAIL);
     };
 
-    const UiDllCodeInfo = @typeInfo(UiDllCode).@"enum";
+    const uiDllCodeMapping = FileMapping.init(
+        UiDllCode.FILE_MAPPING_NAME,
+        @sizeOf(UiDllCode),
+        win.PAGE_READWRITE,
+    ) orelse {
+        @panic("");
+    };
 
-    const UiDllCodeValues = UiDllCodeInfo.field_values;
-
-    // Create events before injection
-
-    const uiDllCodeEvents = utils.createEventsFromEnum(
-        UiDllCodeValues,
-        UiDllCode.EVENT_NAME_PREFIX,
-        0,
+    const uiDllCodeSyncEvent = utils.createEvent(
+        UiDllCode.SYNC_EVENT_NAME,
         UiDllCode.EVENT_DESIRED_ACCESS,
     ) orelse {
-        @branchHint(.cold);
-
         @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
 
@@ -122,24 +121,21 @@ pub fn main() void {
         @panic(Errors.Main.INJECT_UI_DLL_FAIL);
     };
 
-    const eventUiDllCode = utils.waitAnyEventOfEnum(
-        UiDllCodeInfo.tag_type,
-        UiDllCodeValues.len,
-        &uiDllCodeEvents,
-        &comptime utils.getRuntimeEnumValues(UiDllCodeValues, UiDllCodeInfo.tag_type),
-        comptime constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS + 6000,
-    ) orelse {
-        @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
-    };
+    const waitResult = win.WaitForSingleObject(
+        uiDllCodeSyncEvent,
+        constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS + 6_000,
+    );
 
-    if (eventUiDllCode != @intFromEnum(UiDllCode.Success)) {
-        @panic(Errors.UI_DLL[eventUiDllCode]);
+    const uiDllCodeResult = uiDllCodeMapping.address.*;
+
+    if (waitResult != win.WAIT_OBJECT_0 or uiDllCodeResult == null) {
+        @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
     }
 }
 
 /// Injects DLL of `remoteDllPathAddress` to `process`.
 ///
-/// Returns handle of injecting remote thread or `null` in case of error.
+/// Returns handle of injected remote thread or `null` in case of error.
 inline fn injectDll(
     process: zigWin.HANDLE,
     remoteDllPathAddress: *const anyopaque,
@@ -152,6 +148,7 @@ inline fn injectDll(
     return utils.createRemoteThread(
         process,
         @ptrCast(loadLibraryW),
+
         @constCast(remoteDllPathAddress),
     );
 }

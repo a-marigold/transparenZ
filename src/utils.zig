@@ -379,10 +379,12 @@ pub const FileMapping = struct {
     handle: zigWin.HANDLE,
 
     /// Address of mapped memory in the address space of process.
-    address: *anyopaque,
+    address: *?anyopaque,
 
     pub inline fn init(
         name: []const u16,
+        /// Size of mapping in bytes.
+        size: u32,
         /// `flProtect` parameter of `CreateFileMappingW`.
         protectFlags: u32,
     ) ?FileMapping {
@@ -391,7 +393,7 @@ pub const FileMapping = struct {
             null,
             protectFlags,
             0,
-            0,
+            size,
             name,
         ) orelse {
             return null;
@@ -410,6 +412,7 @@ pub const FileMapping = struct {
 
         return .{
             .handle = mapping,
+
             .address = address,
         };
     }
