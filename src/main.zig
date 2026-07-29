@@ -21,6 +21,7 @@ pub const panic = std.debug.FullPanic(struct {
         }
 
         // Safe stderr writing without allocations
+
         if (win.GetStdHandle(win.STD_ERROR_HANDLE)) |handle| {
             @branchHint(.likely);
 
@@ -112,25 +113,32 @@ const InjectDllError = error{
 /// Returns handle of remote `process` thread which executes `LoadLibraryW`
 /// to be waited or used in any way or `InjectDllError` in case of error.
 inline fn injectDll(process: zigWin.HANDLE, dllPath: [:0]const u16) InjectDllError!zigWin.HMODULE {
-    const dllPathWithNullTerm = dllPath.len + 1;
+    const dllPathBytesWithNullTerm =
+        dllPath.len + 1 * @sizeOf(u16);
+
     const dllPathAddress = utils.allocRemoteMemory(
         process,
-        dllPathWithNullTerm * @sizeOf(u16),
+        dllPathBytesWithNullTerm * @sizeOf(u16),
     ) orelse {
         return InjectDllError.AllocDllPathFail;
     };
+    defer utils.freeRemoteMemory(
+        process,
+        dllPathAddress,
+        dllPathBytesWithNullTerm,
+    );
+
     utils.writeRemoteMemory(
         process,
         dllPathAddress,
         dllPath,
-        dllPathWithNullTerm * @sizeOf(u16),
+        dllPathBytesWithNullTerm,
     ) orelse {
         return InjectDllError.AllocDllPathFail;
     };
 
     const loadLibrary = win.GetProcAddress(
         win.GetModuleHandleW("kernel32.dll"),
-
         "LoadLibraryW",
     );
 
