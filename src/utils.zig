@@ -164,9 +164,9 @@ pub inline fn writeRemoteMemory(
     }
 }
 
-const ThreadRoutine = fn (routineArg: ?*anyopaque) callconv(.winapi) ThreadReturnValue;
+const ThreadRoutine = fn (routineArg: ?*anyopaque) callconv(.winapi) ThreadRoutineResult;
 
-pub const ThreadReturnValue = enum(zigWin.DWORD) {
+pub const ThreadRoutineResult = enum(zigWin.DWORD) {
     Success = 0,
     Fail = 1,
 };
@@ -225,6 +225,10 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
     unreachable;
 }
 
+/// Returns address of `lib` function with name `fnName`.
+pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: []const u8) *const Fn {
+    return @ptrCast(win.GetProcAddress(lib, fnName));
+}
 /// Creates events via `CreateEventExW` for every element of `EnumValues`.
 ///
 /// Uses `getEventNameOfEnumValue` to create names for events.

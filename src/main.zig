@@ -107,7 +107,7 @@ pub fn main() void {
     _ = injectDll(
         explorerProcess,
         remoteUiDllPathAddress,
-        getLibFn(
+        utils.getLibFn(
             win.GetModuleHandleW("kernel32.dll"),
             win.LoadLibraryW,
             "LoadLibraryW",
@@ -148,8 +148,4 @@ inline fn injectDll(
         @ptrCast(loadLibraryW),
         remoteDllPathAddress,
     );
-}
-
-inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: []const u8) *const Fn {
-    return @ptrCast(win.GetProcAddress(lib, fnName));
 }
