@@ -99,7 +99,7 @@ pub fn main() void {
         @sizeOf(UiDllCode),
         win.PAGE_READWRITE,
     ) orelse {
-        @panic("");
+        @panic(Errors.Main.CREATE_UI_DLL_CODE_MAPPING_FAIL);
     };
 
     const uiDllCodeSyncEvent = utils.createEvent(

@@ -72,6 +72,8 @@ pub const Errors = struct {
         pub const INJECT_UI_DLL_FAIL =
             "Failed to inject '" ++ UI_DLL_FILE_NAME ++ "' to 'explorer.exe.'";
 
+        pub const CREATE_UI_DLL_CODE_MAPPING_FAIL = "Failed to create file mapping for '" ++ UI_DLL_FILE_NAME ++ "' status code.";
+
         pub const CREATE_UI_DLL_CODE_EVENT_FAIL =
             "Failed to create sync event for '" ++ UI_DLL_FILE_NAME ++ "'.";
 
