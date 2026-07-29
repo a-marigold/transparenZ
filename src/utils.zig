@@ -226,7 +226,7 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 }
 
 /// Returns address of `lib` function with name `fnName`.
-pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: []const u8) *const Fn {
+pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: [:0]const u8) *const Fn {
     return @ptrCast(win.GetProcAddress(lib, fnName));
 }
 /// Creates events via `CreateEventExW` for every element of `EnumValues`.

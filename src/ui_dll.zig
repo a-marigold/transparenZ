@@ -23,7 +23,7 @@ var taskbarHook = &TaskbarHook.taskbarHook;
 /// Handle of this DLL.
 ///
 /// Initialized in `DllMain`.
-var dllHandle: zigWin.HINSTANCE = undefined;
+var dllHandle: zigWin.HMODULE = undefined;
 
 export fn DllMain(
     hinstDLL: zigWin.HINSTANCE,
@@ -32,8 +32,9 @@ export fn DllMain(
 ) callconv(.winapi) win.BOOL {
     _ = lpvReserved;
 
-    dllHandle = hinstDLL;
-    // debug("entering dll", .{});
+    dllHandle = @ptrCast(hinstDLL);
+
+    debug("entering dll", .{});
 
     if (fwdReason == win.DLL_PROCESS_ATTACH) {
         _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
@@ -41,7 +42,8 @@ export fn DllMain(
         // New thread is used 'cause `initXamlDiags`
         // loads libraries and can cause loader lock
         const thread = utils.createThread(&init, null);
-        // debug("{?}\n{}\n", .{ thread, zigWin.GetLastError() });
+
+        debug("{?}\n{}\n", .{ thread, zigWin.GetLastError() });
 
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
@@ -172,7 +174,7 @@ fn init(
         diagsName[diagsName.len - 2] = diagsNameCount[0];
         diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
-        // debug("attempt {}", .{attemptCount});
+        debug("attempt {}", .{attemptCount});
 
         var initXamlDiagsResult: win.HRESULT = undefined;
 
@@ -356,25 +358,25 @@ inline fn exitDll(dll: zigWin.HMODULE, exitCode: utils.ThreadRoutineResult) nore
     unreachable;
 }
 
-// /// Used only in Debug build mode.
-// ///
-// /// Outputs debug string to `explorer.exe`.
-// ///
-// /// That means to read the output, debugger must be attached to `explorer.exe`.
-// fn debug(comptime format: []const u8, args: anytype) void {
-//     if (builtin.mode != .Debug) {
-//         @compileError("'debug' function is only for Debug build mode");
-//     }
+/// Used only in Debug build mode.
+///
+/// Outputs debug string to `explorer.exe`.
+///
+/// That means to read the output, debugger must be attached to `explorer.exe`.
+fn debug(comptime format: []const u8, args: anytype) void {
+    if (builtin.mode != .Debug) {
+        @compileError("'debug' function is only for Debug build mode");
+    }
 
-//     const allocator = std.debug.getDebugInfoAllocator();
+    const allocator = std.debug.getDebugInfoAllocator();
 
-//     // Intended not to free the strings
+    // Intended not to free the strings
 
-//     const formattedString = allocator.print(format, args) catch unreachable;
-//     const debugString = unicode.utf8ToUtf16LeAllocZ(
-//         allocator,
-//         formattedString,
-//     ) catch unreachable;
+    const formattedString = allocator.print(format, args) catch unreachable;
+    const debugString = unicode.utf8ToUtf16LeAllocZ(
+        allocator,
+        formattedString,
+    ) catch unreachable;
 
-//     win.OutputDebugStringW(debugString);
-// }
+    win.OutputDebugStringW(debugString);
+}

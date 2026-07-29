@@ -287,7 +287,7 @@ pub const InitializeXamlDiagnosticsEx = fn (
     wszInitializationData: ?zigWin.LPCWSTR,
 ) callconv(.winapi) HRESULT;
 
-pub extern "kernel32" fn LoadLibraryW(
+pub const LoadLibraryW = fn (
     lpLibFileName: zigWin.LPCWSTR,
 ) callconv(.winapi) zigWin.HMODULE;
 

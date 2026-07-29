@@ -78,17 +78,23 @@ pub fn main() void {
     ) orelse {
         @panic(Errors.Main.ALLOC_UI_DLL_PATH_FAIL);
     };
+    defer utils.freeRemoteMemory(
+        explorerProcess,
+        remoteUiDllPathAddress,
+        uiDllPathSizeWithNullTerm,
+    );
 
     utils.writeRemoteMemory(
         explorerProcess,
         remoteUiDllPathAddress,
-        uiDllPath,
+        uiDllPath.ptr,
         uiDllPathSizeWithNullTerm,
     ) orelse {
         @panic(Errors.Main.ALLOC_UI_DLL_PATH_FAIL);
     };
 
     const UiDllCodeInfo = @typeInfo(UiDllCode).@"enum";
+
     const UiDllCodeValues = UiDllCodeInfo.field_values;
 
     // Create events before injection
@@ -108,7 +114,7 @@ pub fn main() void {
         explorerProcess,
         remoteUiDllPathAddress,
         utils.getLibFn(
-            win.GetModuleHandleW("kernel32.dll"),
+            win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
             win.LoadLibraryW,
             "LoadLibraryW",
         ),
@@ -146,6 +152,6 @@ inline fn injectDll(
     return utils.createRemoteThread(
         process,
         @ptrCast(loadLibraryW),
-        remoteDllPathAddress,
+        @constCast(remoteDllPathAddress),
     );
 }
