@@ -29,6 +29,8 @@ pub const PAGE_READWRITE = 0x04;
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
 pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;
 
+pub const MEM_RELEASE = 0x00008000;
+
 pub const WM_CLOSE: zigWin.UINT = 0x0010;
 
 pub const HRESULT = enum(zigWin.DWORD) {
@@ -285,11 +287,19 @@ pub const InitializeXamlDiagnosticsEx = fn (
     wszInitializationData: ?zigWin.LPCWSTR,
 ) callconv(.winapi) HRESULT;
 
+pub extern "kernel32" fn LoadLibraryW(
+    lpLibFileName: zigWin.LPCWSTR,
+) callconv(.winapi) zigWin.HMODULE;
+
 pub extern "kernel32" fn LoadLibraryExW(
     lpLibFileName: zigWin.LPCWSTR,
     hFile: ?zigWin.HANDLE,
     dwFlags: zigWin.DWORD,
 ) callconv(.winapi) zigWin.HMODULE;
+
+pub extern "kernel32" fn FreeLibrary(
+    hLibModule: zigWin.HMODULE,
+) callconv(.winapi) BOOL;
 
 pub extern "kernel32" fn WriteFile(
     hFile: zigWin.HANDLE,
@@ -427,7 +437,9 @@ pub extern "user32" fn PostMessageW(
     lParam: LPARAM,
 ) callconv(.winapi) BOOL;
 
-pub extern "kernel32" fn GetExitCodeThread(
-    hThread: zigWin.HANDLE,
-    lpExitCode: zigWin.LPDWORD,
+pub extern "kernel32" fn VirtualFreeEx(
+    hProcess: zigWin.HANDLE,
+    lpAddress: zigWin.LPVOID,
+    dwSize: zigWin.SIZE_T,
+    dwFreeType: zigWin.DWORD,
 ) callconv(.winapi) BOOL;

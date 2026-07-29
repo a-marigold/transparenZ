@@ -44,6 +44,7 @@ pub const panic = std.debug.FullPanic(struct {
 pub fn main() void {
     const explorerProcess = utils.findProcessByWindowClass(
         unicode.utf8ToUtf16LeStringLiteral(constants.TASKBAR_CLASS_NAME),
+
         win.PROCESS_VM_OPERATION | win.PROCESS_VM_WRITE | win.PROCESS_CREATE_THREAD,
     ) orelse {
         @branchHint(.cold);
@@ -65,12 +66,29 @@ pub fn main() void {
         break :block utils.appendPathStringLiteral(
             &buffer,
             exeDirName.len,
-            unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
+            comptime unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
         );
     };
 
-    const UiDllCodeInfo = @typeInfo(UiDllCode).@"enum";
+    const uiDllPathSizeWithNullTerm = (uiDllPath.len + 1) * @sizeOf(u16);
 
+    const remoteUiDllPathAddress = utils.allocRemoteMemory(
+        explorerProcess,
+        uiDllPathSizeWithNullTerm,
+    ) orelse {
+        @panic(Errors.Main.ALLOC_UI_DLL_PATH_FAIL);
+    };
+
+    utils.writeRemoteMemory(
+        explorerProcess,
+        remoteUiDllPathAddress,
+        uiDllPath,
+        uiDllPathSizeWithNullTerm,
+    ) orelse {
+        @panic(Errors.Main.ALLOC_UI_DLL_PATH_FAIL);
+    };
+
+    const UiDllCodeInfo = @typeInfo(UiDllCode).@"enum";
     const UiDllCodeValues = UiDllCodeInfo.field_values;
 
     // Create events before injection
@@ -86,7 +104,17 @@ pub fn main() void {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
 
-    _ = injectDll(explorerProcess, uiDllPath);
+    _ = injectDll(
+        explorerProcess,
+        remoteUiDllPathAddress,
+        getLibFn(
+            win.GetModuleHandleW("kernel32.dll"),
+            win.LoadLibraryW,
+            "LoadLibraryW",
+        ),
+    ) orelse {
+        @panic(Errors.Main.INJECT_UI_DLL_FAIL);
+    };
 
     const eventUiDllCode = utils.waitAnyEventOfEnum(
         UiDllCodeInfo.tag_type,
@@ -103,52 +131,25 @@ pub fn main() void {
     }
 }
 
-const InjectDllError = error{
-    AllocDllPathFail,
-    CreateRemoteThreadFail,
-};
-
-/// Injects DLL from `dllPath` to `process`.
+/// Injects DLL of `remoteDllPathAddress` to `process`.
 ///
-/// Returns handle of remote `process` thread which executes `LoadLibraryW`
-/// to be waited or used in any way or `InjectDllError` in case of error.
-inline fn injectDll(process: zigWin.HANDLE, dllPath: [:0]const u16) InjectDllError!zigWin.HMODULE {
-    const dllPathBytesWithNullTerm =
-        dllPath.len + 1 * @sizeOf(u16);
-
-    const dllPathAddress = utils.allocRemoteMemory(
+/// Returns handle of injecting remote thread or `null` in case of error.
+inline fn injectDll(
+    process: zigWin.HANDLE,
+    remoteDllPathAddress: *const anyopaque,
+    /// Pointer to `LoadLibraryW` function of `kernel32.dll` that is valid in `process` address space.
+    ///
+    /// This parameter is needed when DLLs injected multiple times,
+    /// not to search `LoadLibraryW` address every time.
+    loadLibraryW: *const win.LoadLibraryW,
+) ?zigWin.HANDLE {
+    return utils.createRemoteThread(
         process,
-        dllPathBytesWithNullTerm * @sizeOf(u16),
-    ) orelse {
-        return InjectDllError.AllocDllPathFail;
-    };
-    defer utils.freeRemoteMemory(
-        process,
-        dllPathAddress,
-        dllPathBytesWithNullTerm,
+        @ptrCast(loadLibraryW),
+        remoteDllPathAddress,
     );
+}
 
-    utils.writeRemoteMemory(
-        process,
-        dllPathAddress,
-        dllPath,
-        dllPathBytesWithNullTerm,
-    ) orelse {
-        return InjectDllError.AllocDllPathFail;
-    };
-
-    const loadLibrary = win.GetProcAddress(
-        win.GetModuleHandleW("kernel32.dll"),
-        "LoadLibraryW",
-    );
-
-    const thread = utils.createRemoteThread(
-        process,
-        @ptrCast(loadLibrary),
-        dllPathAddress,
-    ) orelse {
-        return InjectDllError.CreateRemoteThreadFail;
-    };
-
-    return thread;
+inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: []const u8) *const Fn {
+    return @ptrCast(win.GetProcAddress(lib, fnName));
 }
