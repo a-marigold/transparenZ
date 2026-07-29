@@ -365,14 +365,27 @@ pub fn getRuntimeEnumValues(
     return runtimeValues;
 }
 
-const FileMapping = struct {
+/// Creates nonsignaled auto reseted event.
+pub inline fn createEvent(
+    name: []const u16,
+    /// `dwDesiredAccess` parameter of `CreateEventExW`.
+    desiredAccess: u32,
+) ?zigWin.HANDLE {
+    return win.CreateEventExW(null, name, 0, desiredAccess);
+}
+
+pub const FileMapping = struct {
     /// Handle of mapping.
     handle: zigWin.HANDLE,
 
     /// Address of mapped memory in the address space of process.
     address: *anyopaque,
 
-    pub fn init(name: []const u16, protectFlags: u32) ?FileMapping {
+    pub inline fn init(
+        name: []const u16,
+        /// `flProtect` parameter of `CreateFileMappingW`.
+        protectFlags: u32,
+    ) ?FileMapping {
         const mapping = win.CreateFileMappingW(
             win.INVALID_HANDLE_VALUE,
             null,
