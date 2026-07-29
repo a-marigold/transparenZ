@@ -297,9 +297,10 @@ pub extern "kernel32" fn LoadLibraryExW(
     dwFlags: zigWin.DWORD,
 ) callconv(.winapi) zigWin.HMODULE;
 
-pub extern "kernel32" fn FreeLibrary(
+pub extern "kernel32" fn FreeLibraryAndExitThread(
     hLibModule: zigWin.HMODULE,
-) callconv(.winapi) BOOL;
+    dwExitCode: zigWin.DWORD,
+) callconv(.winapi) void;
 
 pub extern "kernel32" fn WriteFile(
     hFile: zigWin.HANDLE,
@@ -312,7 +313,6 @@ pub extern "kernel32" fn WriteFile(
 pub extern "kernel32" fn GetCurrentProcess() callconv(.winapi) zigWin.HANDLE;
 
 pub extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) zigWin.DWORD;
-
 pub extern "kernel32" fn OpenProcess(
     dwDesiredAccess: zigWin.DWORD,
     bInheritHandle: BOOL,

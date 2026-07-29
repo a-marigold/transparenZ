@@ -7,6 +7,7 @@
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
+const builtin = @import("builtin");
 
 const win = @import("win.zig");
 const constants = @import("constants.zig");
@@ -32,6 +33,7 @@ export fn DllMain(
     _ = lpvReserved;
 
     dllHandle = hinstDLL;
+    // debug("entering dll", .{});
 
     if (fwdReason == win.DLL_PROCESS_ATTACH) {
         _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
@@ -39,6 +41,7 @@ export fn DllMain(
         // New thread is used 'cause `initXamlDiags`
         // loads libraries and can cause loader lock
         const thread = utils.createThread(&init, null);
+        // debug("{?}\n{}\n", .{ thread, zigWin.GetLastError() });
 
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
@@ -72,7 +75,7 @@ export fn DllGetClassObject(
 fn init(
     /// Used in `createThread` so this parameter is needed.
     routineArg: ?*anyopaque,
-) callconv(.winapi) utils.ThreadReturnValue {
+) callconv(.winapi) utils.ThreadRoutineResult {
     _ = routineArg;
 
     const winUiXamlDll = win.LoadLibraryExW(
@@ -81,11 +84,11 @@ fn init(
         win.LOAD_LIBRARY_SEARCH_SYSTEM32,
     );
 
-    const initializeXamlDiagnosticsEx: *const win.InitializeXamlDiagnosticsEx =
-        @ptrCast(@alignCast(win.GetProcAddress(
-            winUiXamlDll,
-            "InitializeXamlDiagnosticsEx",
-        )));
+    const initializeXamlDiagnosticsEx = utils.getLibFn(
+        winUiXamlDll,
+        win.InitializeXamlDiagnosticsEx,
+        "InitializeXamlDiagnosticsEx",
+    );
 
     const uiDllPath = block: {
         var buffer: [zigWin.MAX_PATH:0]u16 = undefined;
@@ -94,7 +97,7 @@ fn init(
     } orelse {
         setUiDllCodeEvent(.GetExePathFail);
 
-        return .Fail;
+        exitDll(dllHandle, .Fail);
     };
 
     const currentPid = win.GetCurrentProcessId();
@@ -113,8 +116,9 @@ fn init(
             diagsDllName: [:0]const u16,
             tapClsid: *const zigWin.GUID,
         };
+
         /// Used as start routine of a thread in the loop below.
-        fn routine(context: *@This().Context) callconv(.winapi) utils.ThreadReturnValue {
+        fn routine(context: *@This().Context) callconv(.winapi) utils.ThreadRoutineResult {
             context.result.* = context.initializeXamlDiagnosticsEx(
                 context.endPointName,
                 context.pid,
@@ -133,6 +137,7 @@ fn init(
         var context: InitXamlDiagsRoutine.Context = .{
             // Values are assigned below or in the loop
 
+            // TODO: consider replacing `result` with `taskbarHook.iXamlDiagnostics` null-check
             .result = undefined,
             .initializeXamlDiagnosticsEx = undefined,
 
@@ -167,6 +172,8 @@ fn init(
         diagsName[diagsName.len - 2] = diagsNameCount[0];
         diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
+        // debug("attempt {}", .{attemptCount});
+
         var initXamlDiagsResult: win.HRESULT = undefined;
 
         routineContext.result = &initXamlDiagsResult;
@@ -188,6 +195,8 @@ fn init(
             }
         }
 
+        debug("diags result {}\nerror {}\n", .{ initXamlDiagsResult, zigWin.GetLastError() });
+
         win.Sleep(attemptInterval);
     }
 
@@ -200,15 +209,18 @@ fn init(
         if (registerCallbackResult != .S_OK) {
             setUiDllCodeEvent(.RegisterTreeServiceCallbackFail);
 
-            return .Fail;
+            exitDll(dllHandle, .Fail);
         }
     } else {
         setUiDllCodeEvent(.InitXamlDiagsFail);
 
-        return .Fail;
+        debug("init diags fail", .{});
+
+        exitDll(dllHandle, .Fail);
     }
 
     // Neccessarily indicate success
+
     setUiDllCodeEvent(.Success);
 
     return .Success;
@@ -329,6 +341,7 @@ inline fn getInspectableFromHandle(
 
     return null;
 }
+
 inline fn setUiDllCodeEvent(code: UiDllCode) void {
     _ = utils.setEventOfEnum(
         UiDllCode.EVENT_NAME_PREFIX,
@@ -336,3 +349,32 @@ inline fn setUiDllCodeEvent(code: UiDllCode) void {
         UiDllCode.EVENT_DESIRED_ACCESS,
     );
 }
+
+/// Unloads `dll` from the current process and exits the current thread.
+inline fn exitDll(dll: zigWin.HMODULE, exitCode: utils.ThreadRoutineResult) noreturn {
+    _ = win.FreeLibraryAndExitThread(dll, @intFromEnum(exitCode));
+    unreachable;
+}
+
+// /// Used only in Debug build mode.
+// ///
+// /// Outputs debug string to `explorer.exe`.
+// ///
+// /// That means to read the output, debugger must be attached to `explorer.exe`.
+// fn debug(comptime format: []const u8, args: anytype) void {
+//     if (builtin.mode != .Debug) {
+//         @compileError("'debug' function is only for Debug build mode");
+//     }
+
+//     const allocator = std.debug.getDebugInfoAllocator();
+
+//     // Intended not to free the strings
+
+//     const formattedString = allocator.print(format, args) catch unreachable;
+//     const debugString = unicode.utf8ToUtf16LeAllocZ(
+//         allocator,
+//         formattedString,
+//     ) catch unreachable;
+
+//     win.OutputDebugStringW(debugString);
+// }
