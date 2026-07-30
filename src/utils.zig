@@ -269,12 +269,14 @@ pub const FileMapping = struct {
         /// Size of mapping in bytes.
         size: u32,
         /// `flProtect` parameter of `CreateFileMappingW`.
-        protectFlags: u32,
+        mappingFlags: u32,
+        /// `dwDesiredAccess` parameter of `MapViewOfFileEx`.
+        mapViewFlags: u32,
     ) ?FileMapping {
         const mapping = win.CreateFileMappingW(
             win.INVALID_HANDLE_VALUE,
             null,
-            protectFlags,
+            mappingFlags,
             0,
             size,
             name,
@@ -284,7 +286,7 @@ pub const FileMapping = struct {
 
         const ptr = win.MapViewOfFileEx(
             mapping,
-            protectFlags,
+            mapViewFlags,
             0,
             0,
             0,
@@ -293,6 +295,8 @@ pub const FileMapping = struct {
             return null;
         };
 
+        std.debug.print("{}\n{}\n", .{ ptr, zigWin.GetLastError() });
+
         return .{
             .handle = mapping,
 
@@ -300,9 +304,16 @@ pub const FileMapping = struct {
         };
     }
 
-    pub fn open(name: [:0]const u16, size: u32, protectFlags: u32) ?FileMapping {
+    pub fn open(
+        name: [:0]const u16,
+        size: u32,
+        /// `OpenFileMappingW` parameter named `dwDesiredAccess`.
+        mappingFlags: u32,
+        /// `MapViewOfFileEx` parameter named `dwDesiredAccess`.
+        mapViewFlags: u32,
+    ) ?FileMapping {
         const mapping = win.OpenFileMappingW(
-            protectFlags,
+            mappingFlags,
             win.FALSE,
             name,
         ) orelse {
@@ -311,7 +322,7 @@ pub const FileMapping = struct {
 
         const ptr = win.MapViewOfFileEx(
             mapping,
-            protectFlags,
+            mapViewFlags,
             0,
             size,
             0,
@@ -322,13 +333,12 @@ pub const FileMapping = struct {
 
         return .{
             .handle = mapping,
-
             .ptr = ptr,
         };
     }
 };
 
 /// Intended to be called at comptime.
-pub fn isDebugMode() bool {
-    return builtin.mode == .Debug;
+pub inline fn isDebugMode() bool {
+    return comptime builtin.mode == .Debug;
 }
