@@ -25,12 +25,11 @@ pub const STYLE_TASKBAR_ATTEMPTS_TIME_MS = 30_000;
 
 /// Used to share successfull completion of taskbar styling or an error from `ui.dll` to main process.
 ///
+/// The main process creates `UiDllCode.FileMapping.NAME` mapping
+/// and `UiDllCode.SYNC_EVENT_NAME` event and waits for the event.
 ///
-///
-/// `ui.dll` writes a `UiDllCode` to `UiDllCode.FILE_MAPPING_NAME` mapping
+/// Then, `ui.dll` writes a `UiDllCode` to `UiDllCode.FileMapping.NAME` mapping
 /// and then signals `SYNC_EVENT_NAME` event to wake up the main process.
-///
-/// The main process waits for `UiDllCode.SYNC_EVENT_NAME` event.
 pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI_DLL_ERRORS` array
     Success,
 
@@ -40,17 +39,24 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
     GetIShapeInCallbackFail,
     IXamlDiagnosticsNullInCallback,
 
-    /// See `UiDllCode`.
-    pub const EVENT_NAME_PREFIX = "Local\\tZyC";
+    pub const FileMapping = struct {
+        /// Name of mapping created by the main process.
+        pub const NAME = "Local\\tZyM";
 
-    /// Name of file mapping created by the main process.
-    pub const FILE_MAPPING_NAME = "Local\\tZyM";
+        /// Size of the mapping.
+        pub const SIZE = @sizeOf(UiDllCode);
 
-    /// Name of event created by the main process.
-    pub const SYNC_EVENT_NAME = "Local\\tZyE";
+        /// `flProtect` of `CreateFileMapping` function that creates the `ui.dll` status code mapping.
+        pub const PROTECT_FLAGS = win.PAGE_READWRITE;
+    };
 
-    /// `dwDesitedAccess` of `CreateEvent` and `OpenEvent` function that create the `ui.dll` sync event.
-    pub const SYNC_EVENT_DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
+    pub const SyncEvent = struct {
+        /// Name of event created by the main process.
+        pub const NAME = "Local\\tZyE";
+
+        /// `dwDesiredAccess` of `CreateEvent` and `OpenEvent` function that create the `ui.dll` sync event.
+        pub const DESIRED_ACCESS = win.SYNCHRONIZE | win.EVENT_MODIFY_STATE;
+    };
 };
 
 /// Error messages of main process and `ui.dll`.
@@ -147,5 +153,6 @@ pub const UTF16_NUMBERS = block: {
 
         numbers[number] = &utf16Number;
     }
+
     break :block numbers;
 };

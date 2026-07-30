@@ -341,7 +341,7 @@ pub extern "kernel32" fn CreateFileMappingW(
 
 pub extern "kernel32" fn OpenFileMappingW(
     dwDesiredAccess: zigWin.DWORD,
-    bInheritHandle: zigWin.BOOL,
+    bInheritHandle: BOOL,
     lpName: zigWin.LPCWSTR,
 ) callconv(.winapi) ?zigWin.HANDLE;
 

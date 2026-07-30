@@ -11,6 +11,8 @@ const Errors = constants.Errors;
 
 const UiDllCode = constants.UiDllCode;
 
+const UiDllCodeTagType = @typeInfo(UiDllCode).@"enum".tag_type;
+
 const FileMapping = utils.FileMapping;
 
 pub const panic = std.debug.FullPanic(struct {
@@ -93,12 +95,10 @@ pub fn main() void {
         @panic(Errors.Main.ALLOC_UI_DLL_PATH_FAIL);
     };
 
-    const UiDllCodeTagType = @typeInfo(UiDllCode).@"enum".tag_type;
-
     const uiDllCodeMapping = FileMapping.create(
-        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FILE_MAPPING_NAME),
-        @sizeOf(UiDllCode),
-        win.PAGE_READWRITE,
+        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
+        UiDllCode.FileMapping.SIZE,
+        UiDllCode.FileMapping.PROTECT_FLAGS,
     ) orelse {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_MAPPING_FAIL);
     };
@@ -110,8 +110,8 @@ pub fn main() void {
     uiDllCodeAddress.* = uiDllCodeSentinel;
 
     const uiDllCodeSyncEvent = utils.createEvent(
-        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SYNC_EVENT_NAME),
-        UiDllCode.SYNC_EVENT_DESIRED_ACCESS,
+        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SyncEvent.NAME),
+        UiDllCode.SyncEvent.DESIRED_ACCESS,
     ) orelse {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
@@ -134,7 +134,7 @@ pub fn main() void {
     );
 
     if (waitResult != win.WAIT_OBJECT_0) {
-        @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
+        @panic(Errors.Main.WAIT_UI_DLL_FAIL);
     }
 
     const uiDllCodeResult = uiDllCodeAddress.*;
