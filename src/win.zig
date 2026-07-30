@@ -18,7 +18,7 @@ pub const LPARAM = WPARAM;
 
 pub const STD_ERROR_HANDLE: zigWin.DWORD = @bitCast(@as(i32, -12));
 
-pub const INVALID_HANDLE_VALUE = 0xFFFFFFFFFFFFFFFF;
+pub const INVALID_HANDLE_VALUE: *opaque {} = @ptrFromInt(0xFFFFFFFFFFFFFFFF);
 
 pub const PROCESS_CREATE_THREAD = 0x0002;
 pub const PROCESS_VM_OPERATION = 0x0008;
@@ -345,14 +345,19 @@ pub extern "kernel32" fn OpenFileMappingW(
     lpName: zigWin.LPCWSTR,
 ) callconv(.winapi) ?zigWin.HANDLE;
 
-pub extern "kernel32" fn MapViewOfFile(
+pub extern "kernel32" fn MapViewOfFileEx(
     hFileMappingObject: zigWin.HANDLE,
     dwDesiredAccess: zigWin.DWORD,
     dwFileOffsetHigh: zigWin.DWORD,
     dwFileOffsetLow: zigWin.DWORD,
     dwNumberOfBytesToMap: zigWin.SIZE_T,
-    lpBaseAddress: zigWin.LPVOID,
+    lpBaseAddress: ?zigWin.LPVOID,
 ) callconv(.winapi) ?*anyopaque;
+
+pub extern "kernel32" fn UnmapViewOfFileEx(
+    BaseAddress: zigWin.PVOID,
+    UnmapFlags: zigWin.ULONG,
+) callconv(.winapi) BOOL;
 
 pub extern "kernel32" fn CreateEventExW(
     lpEventAttributes: ?*zigWin.SECURITY_ATTRIBUTES,

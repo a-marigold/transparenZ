@@ -229,61 +229,6 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: [:0]const u8) *const Fn {
     return @ptrCast(win.GetProcAddress(lib, fnName));
 }
-/// Creates events via `CreateEventExW` for every element of `EnumValues`.
-///
-/// Uses `getEventNameOfEnumValue` to create names for events.
-///
-/// Returns created array of event handles, where handles
-/// are located in strict order of `EnumValues`.
-///
-/// If any call of `CreateEventExW` fails, returns `null`.
-///
-/// Example:
-/// ```zig
-/// const Letter = enum(u32) {
-///   A,
-///   B,
-///   C,
-/// };
-/// const letterValues = @typeInfo(Letter).@"enum".field_values;
-///
-/// const events = createEventsFromEnum(letterValues, "Local\\Letter", win.EVENT_ALL_ACCESS);
-///
-/// // Created 'Local\LetterA', 'Local\LetterB', 'Local\LetterC'
-/// // `events[0]` is `Letter.A`, `events[1]` is `Letter.B` and so on
-/// ```
-pub fn createEventsFromEnum(
-    /// `field_values` of an `Enum`.
-    comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
-    /// Must be at least `'Local\'` or `'Global\'`, but not empty.
-    comptime namePrefix: []const u8,
-    /// To be passed to `CreateEventExW`.
-    dwFlags: zigWin.DWORD,
-    /// To be passed to `CreateEventExW`.
-    dwDesiredAccess: zigWin.DWORD,
-) ?[EnumValues.len]zigWin.HANDLE {
-    var events: [EnumValues.len]zigWin.HANDLE = undefined;
-
-    inline for (EnumValues, 0..) |value, index| {
-        const event = win.CreateEventExW(
-            null,
-            comptime getEventNameOfEnumValue(namePrefix, value),
-            dwFlags,
-            dwDesiredAccess,
-        );
-
-        if (event) |eventHandle| {
-            events[index] = eventHandle;
-        } else {
-            @branchHint(.cold);
-
-            return null;
-        }
-    }
-
-    return events;
-}
-
 /// Calls `OpenEventW` with name `namePrefix ++ EnumValue`,
 /// calls `SetEvent` with the event and closes it with `CloseHandle`.
 ///
@@ -313,32 +258,6 @@ pub inline fn setEventOfEnum(
         return win.FALSE;
     }
 }
-
-/// Waits for `events` via `WaitForMultipleObjects`.
-///
-/// Returns value of enum, event of which `WaitForMultipleObjects` returned, or `null` in case of error.
-pub inline fn waitAnyEventOfEnum(
-    comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
-    comptime enumValuesLen: u64,
-    /// Events from `createEventsFromEnum` function.
-    events: *const [enumValuesLen]zigWin.HANDLE,
-    /// Runtime enum values from `getRuntimeEnumValues` function.
-    enumValues: *const [enumValuesLen]TagType,
-    /// Time in milliseconds
-    timeoutMs: u32,
-) ?TagType {
-    const waitResult = win.WaitForMultipleObjects(events.len, events, win.FALSE, timeoutMs);
-
-    // `WAIT_TIMEOUT` and `WAIT_FAILED` are in out of `enumValuesLen` range
-    if (waitResult >= comptime enumValuesLen + win.WAIT_OBJECT_0) {
-        return null;
-    }
-
-    const eventIndex = waitResult - win.WAIT_OBJECT_0;
-
-    return enumValues[eventIndex];
-}
-
 /// Intended to be called at comptime.
 ///
 /// Returns `namePrefix ++ EnumValue`.
@@ -348,21 +267,6 @@ fn getEventNameOfEnumValue(
     comptime EnumValue: comptime_int,
 ) [:0]const u16 {
     return unicode.utf8ToUtf16LeStringLiteral(namePrefix) ++ constants.UTF16_NUMBERS[EnumValue];
-}
-
-/// Intended to be called at comptime.
-///
-/// Converts comptime `EnumValues` to runtime array with `TagType` elements type.
-pub fn getRuntimeEnumValues(
-    comptime EnumValues: @FieldType(std.lang.Type.Enum, "field_values"),
-    comptime TagType: @FieldType(std.lang.Type.Enum, "tag_type"),
-) [EnumValues.len]TagType {
-    var runtimeValues: [EnumValues.len]TagType = undefined;
-
-    inline for (EnumValues, 0..) |value, index| {
-        runtimeValues[index] = value;
-    }
-    return runtimeValues;
 }
 
 /// Creates nonsignaled auto reseted event.
@@ -378,11 +282,11 @@ pub const FileMapping = struct {
     /// Handle of mapping.
     handle: zigWin.HANDLE,
 
-    /// Address of mapped memory in the address space of process.
-    address: *?anyopaque,
+    /// Address of mapped memory in address space of the current process.
+    address: *anyopaque,
 
-    pub inline fn init(
-        name: []const u16,
+    pub inline fn create(
+        name: [:0]const u16,
         /// Size of mapping in bytes.
         size: u32,
         /// `flProtect` parameter of `CreateFileMappingW`.
@@ -399,11 +303,37 @@ pub const FileMapping = struct {
             return null;
         };
 
-        const address = win.MapViewOfFile(
+        const address = win.MapViewOfFileEx(
             mapping,
             protectFlags,
             0,
             0,
+            0,
+            null,
+        ) orelse {
+            return null;
+        };
+
+        return .{
+            .handle = mapping,
+
+            .address = address,
+        };
+    }
+
+    pub fn open(name: []const u16, size: u32, protectFlags: u32) ?FileMapping {
+        const mapping = win.OpenFileMappingW(
+            protectFlags,
+            win.FALSE,
+            name,
+        ) orelse {
+            return null;
+        };
+        const address = win.MapViewOfFileEx(
+            mapping,
+            protectFlags,
+            0,
+            size,
             0,
             null,
         ) orelse {
