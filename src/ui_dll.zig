@@ -4,6 +4,8 @@
 //!
 //! Compiled file must be named `ui.dll` (see the `constants.zig`).
 
+// TODO: add panic handler
+
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
@@ -13,10 +15,13 @@ const win = @import("win.zig");
 const constants = @import("constants.zig");
 const utils = @import("utils.zig");
 
+const TaskbarHook = @import("taskbar_hook.zig");
+
 const UiDllCode = constants.UiDllCode;
+const UiDllCodeTagType = @typeInfo(UiDllCode).@"enum".tag_type;
 const TaskbarElementNames = constants.TaskbarElementNames;
 
-const TaskbarHook = @import("taskbar_hook.zig");
+const FileMapping = utils.FileMapping;
 
 var taskbarHook = &TaskbarHook.taskbarHook;
 
@@ -80,6 +85,22 @@ fn init(
 ) callconv(.winapi) utils.ThreadRoutineResult {
     _ = routineArg;
 
+    const uiDllCodeMapping = FileMapping.open(
+        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
+        UiDllCode.FileMapping.PROTECT_FLAGS,
+        UiDllCode.FileMapping.SIZE,
+    ) orelse {
+        exitDll(dllHandle, .Fail);
+    };
+    const uiDllCodePtr: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.address));
+
+    const uiDllSyncEvent = utils.openEvent(
+        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SyncEvent.NAME),
+        UiDllCode.SyncEvent.DESIRED_ACCESS,
+    ) orelse {
+        exitDll(dllHandle, .Fail);
+    };
+
     const winUiXamlDll = win.LoadLibraryExW(
         unicode.utf8ToUtf16LeStringLiteral(constants.WINDOWS_UI_XAML_DLL_NAME),
         null,
@@ -97,7 +118,11 @@ fn init(
 
         break :block utils.getExePath(@ptrCast(dllHandle), &buffer);
     } orelse {
-        setUiDllCodeEvent(.GetExePathFail);
+        setUiDllCode(
+            .GetExePathFail,
+            uiDllSyncEvent,
+            uiDllCodePtr,
+        );
 
         exitDll(dllHandle, .Fail);
     };
@@ -182,10 +207,12 @@ fn init(
 
         routineContext.endPointName = &diagsName;
 
-        // Call `InitializeXamlDiagnosticsEx` in another thread
-        // 'cause it works only once per thread
+        // Call `InitializeXamlDiagnosticsEx`
+        // in another thread 'cause it works only once per thread
+
         const initXamlDiagsRoutineThread = utils.createThread(
             @ptrCast(&InitXamlDiagsRoutine.routine),
+
             @constCast(routineContext),
         );
 
@@ -209,12 +236,12 @@ fn init(
         );
 
         if (registerCallbackResult != .S_OK) {
-            setUiDllCodeEvent(.RegisterTreeServiceCallbackFail);
+            setUiDllCode(.RegisterTreeServiceCallbackFail, uiDllSyncEvent, uiDllCodePtr);
 
             exitDll(dllHandle, .Fail);
         }
     } else {
-        setUiDllCodeEvent(.InitXamlDiagsFail);
+        setUiDllCode(.InitXamlDiagsFail, uiDllSyncEvent, uiDllCodePtr);
 
         debug("init diags fail", .{});
 
@@ -223,7 +250,7 @@ fn init(
 
     // Neccessarily indicate success
 
-    setUiDllCodeEvent(.Success);
+    setUiDllCode(.Success, uiDllSyncEvent, uiDllCodePtr);
 
     return .Success;
 }
@@ -265,7 +292,6 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
             ) callconv(.winapi) win.HRESULT {
                 _ = self;
                 _ = relation;
-
                 if (mutationType == .Add) {
                     if (utils.compareNullTermPtrs(u16, element.Name, TaskbarElementNames.BACKGROUND_FILL)) {
                         if (taskbarHook.iXamlDiagnostics) |iXamlDiagnostics| {
@@ -275,14 +301,14 @@ var iVisualTreeServiceCallback: win.IVisualTreeServiceCallback = .{
                                 element.Handle,
                                 iXamlDiagnostics,
                             ) orelse {
-                                setUiDllCodeEvent(.GetIShapeInCallbackFail);
+                                // setUiDllCodeEvent(.GetIShapeInCallbackFail);
 
                                 return .E_FAIL;
                             };
 
                             _ = backgroundFill.vtable.put_Fill(backgroundFill, null);
                         } else {
-                            setUiDllCodeEvent(.IXamlDiagnosticsNullInCallback);
+                            // setUiDllCodeEvent(.IXamlDiagnosticsNullInCallback);
 
                             return .E_FAIL;
                         }
@@ -311,6 +337,7 @@ fn registerVisualTreeServiceCallback(
     if (iVisualTreeService) |treeService| {
         return treeService.vtable.AdviseVisualTreeChange(treeService, callback);
     }
+
     return .E_FAIL;
 }
 
@@ -344,12 +371,25 @@ inline fn getInspectableFromHandle(
     return null;
 }
 
-inline fn setUiDllCodeEvent(code: UiDllCode) void {
-    _ = utils.setEventOfEnum(
-        UiDllCode.EVENT_NAME_PREFIX,
-        @intFromEnum(code),
-        UiDllCode.EVENT_DESIRED_ACCESS,
-    );
+// inline fn setUiDllCodeEvent(code: UiDllCode) void {
+//     _ = utils.setEventOfEnum(
+//         UiDllCode.EVENT_NAME_PREFIX,
+//         @intFromEnum(code),
+//         UiDllCode.EVENT_DESIRED_ACCESS,
+//     );
+// }
+
+/// Writes `code` to `mappingPtr` (the `UiDllCode` file mapping) and signals `syncEvent`.
+fn setUiDllCode(
+    code: UiDllCode,
+    /// See `UiDllCode.SYNC_EVENT_NAME`.
+    syncEvent: zigWin.HANDLE,
+    /// `UiDllCode.FILE_MAPPING_NAME`.
+    mappingPtr: *UiDllCodeTagType,
+) void {
+    mappingPtr.* = @intFromEnum(code);
+
+    _ = win.SetEvent(syncEvent);
 }
 
 /// Unloads `dll` from the current process and exits the current thread.
