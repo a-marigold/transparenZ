@@ -232,45 +232,6 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: [:0]const u8) *const Fn {
     return @ptrCast(win.GetProcAddress(lib, fnName));
 }
-/// Calls `OpenEventW` with name `namePrefix ++ EnumValue`,
-/// calls `SetEvent` with the event and closes it with `CloseHandle`.
-///
-/// Uses `getEventNameOfEnumValue` to create names for events.
-///
-/// Returns `BOOL` indicating success or fail.
-pub inline fn setEventOfEnum(
-    /// Must be at least `'Local\'` or `'Global\'`, but not empty.
-    comptime namePrefix: []const u8,
-    comptime EnumValue: comptime_int,
-    /// To be passed to `OpenEventW`.
-    dwDesiredAccess: zigWin.DWORD,
-) win.BOOL {
-    const event = win.OpenEventW(
-        dwDesiredAccess,
-        win.FALSE,
-        comptime getEventNameOfEnumValue(namePrefix, EnumValue),
-    );
-
-    if (event) |eventHandle| {
-        defer _ = win.CloseHandle(eventHandle);
-
-        return win.SetEvent(eventHandle);
-    } else {
-        @branchHint(.cold);
-
-        return win.FALSE;
-    }
-}
-/// Intended to be called at comptime.
-///
-/// Returns `namePrefix ++ EnumValue`.
-fn getEventNameOfEnumValue(
-    /// Must be at least `'Local\'` or `'Global\'`, but not empty.
-    comptime namePrefix: []const u8,
-    comptime EnumValue: comptime_int,
-) [:0]const u16 {
-    return unicode.utf8ToUtf16LeStringLiteral(namePrefix) ++ constants.UTF16_NUMBERS[EnumValue];
-}
 
 /// Creates nonsignaled non-inheritable auto reseted event.
 pub inline fn createEvent(
