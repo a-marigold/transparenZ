@@ -98,7 +98,8 @@ pub fn main() void {
     const uiDllCodeMapping = FileMapping.create(
         unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
         UiDllCode.FileMapping.SIZE,
-        UiDllCode.FileMapping.PROTECT_FLAGS,
+        win.PAGE_READWRITE,
+        win.FILE_MAP_READ | win.FILE_MAP_WRITE,
     ) orelse {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_MAPPING_FAIL);
     };

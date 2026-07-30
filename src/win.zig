@@ -26,7 +26,11 @@ pub const PROCESS_VM_WRITE = 0x0020;
 
 pub const MEM_RESERVE = 0x00002000;
 pub const MEM_COMMIT = 0x00001000;
+pub const PAGE_READONLY = 0x02;
 pub const PAGE_READWRITE = 0x04;
+
+pub const FILE_MAP_READ = 0x0004;
+pub const FILE_MAP_WRITE = 0x0002;
 
 pub const DLL_PROCESS_ATTACH: zigWin.DWORD = 1;
 pub const DLL_PROCESS_DETACH: zigWin.DWORD = 0;

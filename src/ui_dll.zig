@@ -34,7 +34,7 @@ pub const panic = std.debug.FullPanic(struct {
         _ = first_trace_addr;
 
         if (comptime utils.isDebugMode()) {
-            debugLog("{s}", .{msg});
+            __debugLog__("panic {s}", .{msg});
         }
 
         exitDll(dllHandle, .Fail);
@@ -50,7 +50,7 @@ export fn DllMain(
 
     dllHandle = @ptrCast(hinstDLL);
 
-    debugLog("entering dll", .{});
+    __debugLog__("enter dll", .{});
 
     if (fwdReason == win.DLL_PROCESS_ATTACH) {
         _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
@@ -59,7 +59,7 @@ export fn DllMain(
         // loads libraries and can cause loader lock
         const thread = utils.createThread(&init, null);
 
-        debugLog("{?}\n{}\n", .{ thread, zigWin.GetLastError() });
+        __debugLog__("thread {?}\n last error {}", .{ thread, zigWin.GetLastError() });
 
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
@@ -83,8 +83,12 @@ export fn DllGetClassObject(
     // 'cause `DllGetClassObject` is called only by `InitializeXamlDiagnoticsEx`.
     // But it ensures there won't be any problem
     if (std.meta.eql(rclsid.*, TaskbarHook.TASKBAR_HOOK_GUID)) {
+        __debugLog__("DllGetClassObject success\n", .{});
+
         return taskbarHook.vtable.QueryInterface(taskbarHook, riid, ppv);
     }
+
+    __debugLog__("DllGetClassObject fail last error {}", .{zigWin.GetLastError()});
 
     return .CLASS_E_CLASSNOTAVAILABLE;
 }
@@ -98,8 +102,9 @@ fn init(
 
     const uiDllCodeMapping = FileMapping.open(
         unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
-        UiDllCode.FileMapping.PROTECT_FLAGS,
         UiDllCode.FileMapping.SIZE,
+        win.PAGE_READONLY,
+        win.FILE_MAP_WRITE,
     ) orelse {
         exitDll(dllHandle, .Fail);
     };
@@ -210,7 +215,7 @@ fn init(
         diagsName[diagsName.len - 2] = diagsNameCount[0];
         diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
-        debugLog("attempt {}", .{attemptCount});
+        __debugLog__("diags attempt {}", .{attemptCount});
 
         var initXamlDiagsResult: win.HRESULT = undefined;
 
@@ -235,7 +240,7 @@ fn init(
             }
         }
 
-        debugLog("diags result {}\nerror {}\n", .{ initXamlDiagsResult, zigWin.GetLastError() });
+        __debugLog__("diags result {}\nlast error {}", .{ initXamlDiagsResult, zigWin.GetLastError() });
 
         win.Sleep(attemptInterval);
     }
@@ -254,7 +259,7 @@ fn init(
     } else {
         setUiDllCode(.InitXamlDiagsFail, uiDllSyncEvent, uiDllCodePtr);
 
-        debugLog("init diags fail", .{});
+        __debugLog__("init diags fail", .{});
 
         exitDll(dllHandle, .Fail);
     }
@@ -265,6 +270,7 @@ fn init(
 
     return .Success;
 }
+
 /// Used as callback for `IVisualTreeService.vtable.AdviseVisualTreeChange`.
 ///
 /// Triggered immediatly after callback is registered
@@ -411,19 +417,19 @@ inline fn exitDll(dll: zigWin.HMODULE, exitCode: utils.ThreadRoutineResult) nore
 
 /// Used only in Debug build mode.
 ///
-/// Outputs debug string to `explorer.exe`.
+/// Outputs debug string to `explorer.exe` with added new line.
 ///
-/// That means to read the output, debugger must be attached to `explorer.exe`.
-fn debugLog(comptime format: []const u8, args: anytype) void {
-    if (builtin.mode != .Debug) {
-        @compileError("'debug' function is only for Debug build mode");
+/// To read the output, debugger must be attached to `explorer.exe`.
+fn __debugLog__(comptime format: []const u8, args: anytype) void {
+    if (comptime !utils.isDebugMode()) {
+        @compileError("'__debugLog__' function is only for Debug build mode");
     }
 
     const allocator = std.debug.getDebugInfoAllocator();
 
     // Intended not to free the strings
 
-    const formattedString = allocator.print(format, args) catch unreachable;
+    const formattedString = allocator.print("transparenZ: " ++ format ++ "\n", args) catch unreachable;
     const debugString = unicode.utf8ToUtf16LeAllocZ(
         allocator,
         formattedString,

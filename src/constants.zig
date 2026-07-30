@@ -37,6 +37,7 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
     InitXamlDiagsFail,
     RegisterTreeServiceCallbackFail,
     GetIShapeInCallbackFail,
+
     IXamlDiagnosticsNullInCallback,
 
     pub const FileMapping = struct {
@@ -45,9 +46,6 @@ pub const UiDllCode = enum(usize) { // `usize` 'cause it is used as index of `UI
 
         /// Size of the mapping.
         pub const SIZE = @sizeOf(UiDllCode);
-
-        /// `flProtect` of `CreateFileMapping` function that creates the `ui.dll` status code mapping.
-        pub const PROTECT_FLAGS = win.PAGE_READWRITE;
     };
 
     pub const SyncEvent = struct {
