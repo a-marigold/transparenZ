@@ -74,7 +74,7 @@ pub fn main() void {
     };
     const uiDllPathSizeWithNullTerm = (uiDllPath.len + 1) * @sizeOf(u16);
 
-    const remoteUiDllPathAddress = utils.allocRemoteMemory(
+    const remoteUiDllPathPtr = utils.allocRemoteMemory(
         explorerProcess,
         uiDllPathSizeWithNullTerm,
     ) orelse {
@@ -82,13 +82,13 @@ pub fn main() void {
     };
     defer utils.freeRemoteMemory(
         explorerProcess,
-        remoteUiDllPathAddress,
+        remoteUiDllPathPtr,
         uiDllPathSizeWithNullTerm,
     );
 
     utils.writeRemoteMemory(
         explorerProcess,
-        remoteUiDllPathAddress,
+        remoteUiDllPathPtr,
         uiDllPath.ptr,
         uiDllPathSizeWithNullTerm,
     ) orelse {
@@ -106,8 +106,8 @@ pub fn main() void {
     // Init value of `UiDllCode` mapping
     const uiDllCodeSentinel: UiDllCodeTagType = @bitCast(@as(isize, -1));
 
-    const uiDllCodeAddress: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.address));
-    uiDllCodeAddress.* = uiDllCodeSentinel;
+    const uiDllCodePtr: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.ptr));
+    uiDllCodePtr.* = uiDllCodeSentinel;
 
     const uiDllCodeSyncEvent = utils.createEvent(
         unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SyncEvent.NAME),
@@ -118,7 +118,7 @@ pub fn main() void {
 
     _ = injectDll(
         explorerProcess,
-        remoteUiDllPathAddress,
+        remoteUiDllPathPtr,
         utils.getLibFn(
             win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
             win.LoadLibraryW,
@@ -137,7 +137,7 @@ pub fn main() void {
         @panic(Errors.Main.WAIT_UI_DLL_FAIL);
     }
 
-    const uiDllCodeResult = uiDllCodeAddress.*;
+    const uiDllCodeResult = uiDllCodePtr.*;
 
     if (uiDllCodeResult == uiDllCodeSentinel) {
         @panic(Errors.Main.UI_DLL_CODE_MAPPING_EMPTY);
@@ -147,12 +147,12 @@ pub fn main() void {
     }
 }
 
-/// Injects DLL of `remoteDllPathAddress` to `process`.
+/// Injects DLL of `remoteUiDllPathPtr` to `process`.
 ///
 /// Returns handle of injected remote thread or `null` in case of error.
 inline fn injectDll(
     process: zigWin.HANDLE,
-    remoteDllPathAddress: *const anyopaque,
+    remoteDllPathPtr: *const anyopaque,
     /// Pointer to `LoadLibraryW` function of `kernel32.dll` that is valid in `process` address space.
     ///
     /// This parameter is needed not to search
@@ -162,6 +162,6 @@ inline fn injectDll(
     return utils.createRemoteThread(
         process,
         @ptrCast(loadLibraryW),
-        @constCast(remoteDllPathAddress),
+        @constCast(remoteDllPathPtr),
     );
 }

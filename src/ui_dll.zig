@@ -92,7 +92,7 @@ fn init(
     ) orelse {
         exitDll(dllHandle, .Fail);
     };
-    const uiDllCodePtr: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.address));
+    const uiDllCodePtr: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.ptr));
 
     const uiDllSyncEvent = utils.openEvent(
         unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SyncEvent.NAME),

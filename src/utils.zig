@@ -115,6 +115,8 @@ pub fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAccess
 }
 
 /// Allocates `size` amount of bytes in remote `process`.
+///
+/// Returns pointer to allocated bytes that is valid in `process` address space.
 pub inline fn allocRemoteMemory(
     process: zigWin.HANDLE,
     /// Size in bytes.
@@ -133,14 +135,14 @@ pub inline fn allocRemoteMemory(
 /// the memory is not reserved and does not belong to `process`.
 pub inline fn freeRemoteMemory(
     process: zigWin.HANDLE,
-    /// Address of process address space.
-    address: *anyopaque,
+    /// Pointer from which to begin freeing in `process` address space.
+    ptr: *anyopaque,
     /// Size in bytes.
     size: usize,
 ) void {
     _ = win.VirtualFreeEx(
         process,
-        address,
+        ptr,
         size,
         win.MEM_RELEASE,
     );
@@ -150,15 +152,15 @@ pub inline fn freeRemoteMemory(
 ///
 pub inline fn writeRemoteMemory(
     process: zigWin.HANDLE,
-    /// Address from address space of `process`.
-    address: *anyopaque,
+    /// Pointer from address space of `process`.
+    ptr: *anyopaque,
     data: *const anyopaque,
     /// Size in bytes.
     size: usize,
 ) ?void {
     if (win.WriteProcessMemory(
         process,
-        address,
+        ptr,
         data,
         size,
         null,
@@ -256,8 +258,8 @@ pub const FileMapping = struct {
     handle: zigWin.HANDLE,
 
     // TODO: rename to 'ptr'
-    /// Address of mapped memory in address space of the current process.
-    address: *anyopaque,
+    /// Pointer to mapped memory in address space of the current process.
+    ptr: *anyopaque,
 
     pub inline fn create(
         name: [:0]const u16,
@@ -277,7 +279,7 @@ pub const FileMapping = struct {
             return null;
         };
 
-        const address = win.MapViewOfFileEx(
+        const ptr = win.MapViewOfFileEx(
             mapping,
             protectFlags,
             0,
@@ -291,7 +293,7 @@ pub const FileMapping = struct {
         return .{
             .handle = mapping,
 
-            .address = address,
+            .ptr = ptr,
         };
     }
 
@@ -304,7 +306,7 @@ pub const FileMapping = struct {
             return null;
         };
 
-        const address = win.MapViewOfFileEx(
+        const ptr = win.MapViewOfFileEx(
             mapping,
             protectFlags,
             0,
@@ -318,7 +320,7 @@ pub const FileMapping = struct {
         return .{
             .handle = mapping,
 
-            .address = address,
+            .ptr = ptr,
         };
     }
 };
