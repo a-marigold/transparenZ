@@ -104,10 +104,10 @@ pub fn main() void {
     };
 
     // Init value of `UiDllCode` mapping
-    const uiDllCodeMappingSentinel: UiDllCodeTagType = @bitCast(@as(isize, -1));
+    const uiDllCodeSentinel: UiDllCodeTagType = @bitCast(@as(isize, -1));
 
     const uiDllCodeAddress: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.address));
-    uiDllCodeAddress.* = uiDllCodeMappingSentinel;
+    uiDllCodeAddress.* = uiDllCodeSentinel;
 
     const uiDllCodeSyncEvent = utils.createEvent(
         unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SYNC_EVENT_NAME),
@@ -133,9 +133,17 @@ pub fn main() void {
         constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS + 6_000,
     );
 
-    // TODO: divide errors
-    if (waitResult != win.WAIT_OBJECT_0 or uiDllCodeAddress.* == uiDllCodeMappingSentinel) {
+    if (waitResult != win.WAIT_OBJECT_0) {
         @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
+    }
+
+    const uiDllCodeResult = uiDllCodeAddress.*;
+
+    if (uiDllCodeResult == uiDllCodeSentinel) {
+        @panic(Errors.Main.UI_DLL_CODE_MAPPING_EMPTY);
+    }
+    if (uiDllCodeResult != @intFromEnum(UiDllCode.Success)) {
+        @panic(Errors.UI_DLL[uiDllCodeResult]);
     }
 }
 
@@ -147,8 +155,8 @@ inline fn injectDll(
     remoteDllPathAddress: *const anyopaque,
     /// Pointer to `LoadLibraryW` function of `kernel32.dll` that is valid in `process` address space.
     ///
-    /// This parameter is needed when DLLs injected multiple times,
-    /// not to search `LoadLibraryW` address every time.
+    /// This parameter is needed not to search
+    /// `LoadLibraryW` every time, when DLLs injected multiple times.
     loadLibraryW: *const win.LoadLibraryW,
 ) ?zigWin.HANDLE {
     return utils.createRemoteThread(

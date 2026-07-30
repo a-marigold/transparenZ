@@ -72,13 +72,17 @@ pub const Errors = struct {
         pub const INJECT_UI_DLL_FAIL =
             "Failed to inject '" ++ UI_DLL_FILE_NAME ++ "' to 'explorer.exe.'";
 
-        pub const CREATE_UI_DLL_CODE_MAPPING_FAIL = "Failed to create file mapping for '" ++ UI_DLL_FILE_NAME ++ "' status code.";
+        pub const CREATE_UI_DLL_CODE_MAPPING_FAIL =
+            "Failed to create file mapping for '" ++ UI_DLL_FILE_NAME ++ "' status code.";
 
         pub const CREATE_UI_DLL_CODE_EVENT_FAIL =
             "Failed to create sync event for '" ++ UI_DLL_FILE_NAME ++ "'.";
 
-        pub const WAIT_UI_DLL_CODE_EVENTS_FAIL =
+        pub const WAIT_UI_DLL_FAIL =
             "Waiting for '" ++ UI_DLL_FILE_NAME ++ "' completion failed.";
+
+        pub const UI_DLL_CODE_MAPPING_EMPTY =
+            "Mapping with '" ++ UI_DLL_FILE_NAME ++ "' status code is empty after '" ++ UI_DLL_FILE_NAME ++ "' execution.";
     };
 
     /// Array with error messages appearing only in `ui.dll`.
@@ -87,7 +91,8 @@ pub const Errors = struct {
     ///
     /// That is, to access, for example, message of `InitXamlDiagsFail`, do `UI_DLL_ERRORS[UiDllCode.InitXamlDiagsFail]`.
     ///
-    /// `UI_DLL_ERRORS[UiDllCode.Success]` causes undefined behavior 'cause `UiDllCode.Success` index of this array is not filled.
+    /// `UI_DLL_ERRORS[UiDllCode.Success]` causes undefined behavior
+    /// 'cause `UiDllCode.Success` index of this array is not filled.
     pub const UI_DLL = block: {
         var errors: [@typeInfo(UiDllCode).@"enum".field_values.len][:0]const u8 = undefined;
 
