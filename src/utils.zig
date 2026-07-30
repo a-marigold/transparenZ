@@ -272,7 +272,7 @@ fn getEventNameOfEnumValue(
     return unicode.utf8ToUtf16LeStringLiteral(namePrefix) ++ constants.UTF16_NUMBERS[EnumValue];
 }
 
-/// Creates nonsignaled auto reseted event.
+/// Creates nonsignaled non-inheritable auto reseted event.
 pub inline fn createEvent(
     name: [:0]const u16,
     /// `dwDesiredAccess` parameter of `CreateEventExW`.
@@ -281,10 +281,20 @@ pub inline fn createEvent(
     return win.CreateEventExW(null, name, 0, desiredAccess);
 }
 
+/// Opens non-inheritable event.
+pub inline fn openEvent(
+    name: [:0]const u16,
+    /// `dwDesiredAccess` parameter of `OpenEventW`.
+    desiredAccess: u32,
+) ?zigWin.HANDLE {
+    return win.OpenEventW(desiredAccess, win.FALSE, name);
+}
+
 pub const FileMapping = struct {
     /// Handle of mapping.
     handle: zigWin.HANDLE,
 
+    // TODO: rename to 'ptr'
     /// Address of mapped memory in address space of the current process.
     address: *anyopaque,
 
