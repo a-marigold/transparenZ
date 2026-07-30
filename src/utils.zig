@@ -18,6 +18,7 @@ pub inline fn getExePath(
 
     if (pathLen == 0) {
         @branchHint(.cold);
+
         return null;
     }
 
@@ -29,6 +30,7 @@ pub inline fn getExePath(
 /// Returned slice length does not include `\`.
 pub inline fn getDirPath(path: []u16) []u16 {
     const backSlash: u16 = '\\';
+
     var pathIndex = path.len - 1;
     while (path[pathIndex] != backSlash and pathIndex >= 0) {
         pathIndex -= 1;
@@ -98,6 +100,7 @@ pub fn findProcessByWindowClass(windowClassName: zigWin.LPCWSTR, dwDesiredAccess
     };
 
     var pid: zigWin.DWORD = 0;
+
     if (win.GetWindowThreadProcessId(hwnd, &pid) == 0) {
         @branchHint(.cold);
 
@@ -271,7 +274,7 @@ fn getEventNameOfEnumValue(
 
 /// Creates nonsignaled auto reseted event.
 pub inline fn createEvent(
-    name: []const u16,
+    name: [:0]const u16,
     /// `dwDesiredAccess` parameter of `CreateEventExW`.
     desiredAccess: u32,
 ) ?zigWin.HANDLE {
@@ -321,7 +324,7 @@ pub const FileMapping = struct {
         };
     }
 
-    pub fn open(name: []const u16, size: u32, protectFlags: u32) ?FileMapping {
+    pub fn open(name: [:0]const u16, size: u32, protectFlags: u32) ?FileMapping {
         const mapping = win.OpenFileMappingW(
             protectFlags,
             win.FALSE,
@@ -329,6 +332,7 @@ pub const FileMapping = struct {
         ) orelse {
             return null;
         };
+
         const address = win.MapViewOfFileEx(
             mapping,
             protectFlags,

@@ -70,7 +70,6 @@ pub fn main() void {
             comptime unicode.utf8ToUtf16LeStringLiteral(constants.UI_DLL_FILE_NAME),
         );
     };
-
     const uiDllPathSizeWithNullTerm = (uiDllPath.len + 1) * @sizeOf(u16);
 
     const remoteUiDllPathAddress = utils.allocRemoteMemory(
@@ -94,17 +93,25 @@ pub fn main() void {
         @panic(Errors.Main.ALLOC_UI_DLL_PATH_FAIL);
     };
 
-    const uiDllCodeMapping = FileMapping.init(
-        UiDllCode.FILE_MAPPING_NAME,
+    const UiDllCodeTagType = @typeInfo(UiDllCode).@"enum".tag_type;
+
+    const uiDllCodeMapping = FileMapping.create(
+        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FILE_MAPPING_NAME),
         @sizeOf(UiDllCode),
         win.PAGE_READWRITE,
     ) orelse {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_MAPPING_FAIL);
     };
 
+    // Init value of `UiDllCode` mapping
+    const uiDllCodeMappingSentinel: UiDllCodeTagType = @bitCast(@as(isize, -1));
+
+    const uiDllCodeAddress: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.address));
+    uiDllCodeAddress.* = uiDllCodeMappingSentinel;
+
     const uiDllCodeSyncEvent = utils.createEvent(
-        UiDllCode.SYNC_EVENT_NAME,
-        UiDllCode.EVENT_DESIRED_ACCESS,
+        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SYNC_EVENT_NAME),
+        UiDllCode.SYNC_EVENT_DESIRED_ACCESS,
     ) orelse {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
@@ -126,9 +133,8 @@ pub fn main() void {
         constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS + 6_000,
     );
 
-    const uiDllCodeResult = uiDllCodeMapping.address.*;
-
-    if (waitResult != win.WAIT_OBJECT_0 or uiDllCodeResult == null) {
+    // TODO: divide errors
+    if (waitResult != win.WAIT_OBJECT_0 or uiDllCodeAddress.* == uiDllCodeMappingSentinel) {
         @panic(Errors.Main.WAIT_UI_DLL_CODE_EVENTS_FAIL);
     }
 }
@@ -148,7 +154,6 @@ inline fn injectDll(
     return utils.createRemoteThread(
         process,
         @ptrCast(loadLibraryW),
-
         @constCast(remoteDllPathAddress),
     );
 }
