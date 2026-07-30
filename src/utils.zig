@@ -1,6 +1,7 @@
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
+const builtin = @import("builtin");
 
 const win = @import("win.zig");
 const constants = @import("constants.zig");
@@ -32,6 +33,7 @@ pub inline fn getDirPath(path: []u16) []u16 {
     const backSlash: u16 = '\\';
 
     var pathIndex = path.len - 1;
+
     while (path[pathIndex] != backSlash and pathIndex >= 0) {
         pathIndex -= 1;
     }
@@ -232,7 +234,7 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
 
 /// Returns address of `lib` function with name `fnName`.
 pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: [:0]const u8) *const Fn {
-    return @ptrCast(win.GetProcAddress(lib, fnName));
+    return @ptrCast(@alignCast(win.GetProcAddress(lib, fnName)));
 }
 
 /// Creates nonsignaled non-inheritable auto reseted event.
@@ -258,6 +260,7 @@ pub const FileMapping = struct {
     handle: zigWin.HANDLE,
 
     // TODO: rename to 'ptr'
+
     /// Pointer to mapped memory in address space of the current process.
     ptr: *anyopaque,
 
@@ -324,3 +327,8 @@ pub const FileMapping = struct {
         };
     }
 };
+
+/// Intended to be called at comptime.
+pub fn isDebugMode() bool {
+    return builtin.mode == .Debug;
+}

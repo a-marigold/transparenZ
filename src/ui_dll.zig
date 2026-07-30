@@ -29,6 +29,17 @@ var taskbarHook = &TaskbarHook.taskbarHook;
 ///
 /// Initialized in `DllMain`.
 var dllHandle: zigWin.HMODULE = undefined;
+pub const panic = std.debug.FullPanic(struct {
+    fn panic(msg: []const u8, first_trace_addr: ?usize) noreturn {
+        _ = first_trace_addr;
+
+        if (comptime utils.isDebugMode()) {
+            debugLog("{s}", .{msg});
+        }
+
+        exitDll(dllHandle, .Fail);
+    }
+}.panic);
 
 export fn DllMain(
     hinstDLL: zigWin.HINSTANCE,
@@ -39,7 +50,7 @@ export fn DllMain(
 
     dllHandle = @ptrCast(hinstDLL);
 
-    debug("entering dll", .{});
+    debugLog("entering dll", .{});
 
     if (fwdReason == win.DLL_PROCESS_ATTACH) {
         _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
@@ -48,7 +59,7 @@ export fn DllMain(
         // loads libraries and can cause loader lock
         const thread = utils.createThread(&init, null);
 
-        debug("{?}\n{}\n", .{ thread, zigWin.GetLastError() });
+        debugLog("{?}\n{}\n", .{ thread, zigWin.GetLastError() });
 
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
@@ -199,7 +210,7 @@ fn init(
         diagsName[diagsName.len - 2] = diagsNameCount[0];
         diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
-        debug("attempt {}", .{attemptCount});
+        debugLog("attempt {}", .{attemptCount});
 
         var initXamlDiagsResult: win.HRESULT = undefined;
 
@@ -224,7 +235,7 @@ fn init(
             }
         }
 
-        debug("diags result {}\nerror {}\n", .{ initXamlDiagsResult, zigWin.GetLastError() });
+        debugLog("diags result {}\nerror {}\n", .{ initXamlDiagsResult, zigWin.GetLastError() });
 
         win.Sleep(attemptInterval);
     }
@@ -243,7 +254,7 @@ fn init(
     } else {
         setUiDllCode(.InitXamlDiagsFail, uiDllSyncEvent, uiDllCodePtr);
 
-        debug("init diags fail", .{});
+        debugLog("init diags fail", .{});
 
         exitDll(dllHandle, .Fail);
     }
@@ -403,7 +414,7 @@ inline fn exitDll(dll: zigWin.HMODULE, exitCode: utils.ThreadRoutineResult) nore
 /// Outputs debug string to `explorer.exe`.
 ///
 /// That means to read the output, debugger must be attached to `explorer.exe`.
-fn debug(comptime format: []const u8, args: anytype) void {
+fn debugLog(comptime format: []const u8, args: anytype) void {
     if (builtin.mode != .Debug) {
         @compileError("'debug' function is only for Debug build mode");
     }

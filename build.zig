@@ -104,8 +104,7 @@ fn buildTransparenZ(
         const runTar = b.addSystemCommand(&.{
             "tar",
             "-cf",
-            try std.fmt.allocPrint(
-                allocator,
+            try allocator.print(
                 "transparenZ-{s}.tar",
                 .{try target.query.zigTriple(allocator)},
             ),
