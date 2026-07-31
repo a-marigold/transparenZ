@@ -1,7 +1,6 @@
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
-const builtin = @import("builtin");
 
 const win = @import("win.zig");
 const constants = @import("constants.zig");
@@ -14,12 +13,11 @@ const UiDllCode = constants.UiDllCode;
 const UiDllCodeTagType = @typeInfo(UiDllCode).@"enum".tag_type;
 
 const FileMapping = utils.FileMapping;
-
 pub const panic = std.debug.FullPanic(struct {
     fn panic(msg: []const u8, first_trace_addr: ?usize) noreturn {
         @branchHint(.cold);
 
-        if (builtin.mode == .Debug) {
+        if (utils.isDebugMode()) {
             std.debug.defaultPanic(msg, first_trace_addr);
         }
 
@@ -108,16 +106,17 @@ pub fn main() void {
     const uiDllCodeSentinel: UiDllCodeTagType = @bitCast(@as(isize, -1));
 
     const uiDllCodePtr: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.ptr));
+
     uiDllCodePtr.* = uiDllCodeSentinel;
 
-    const uiDllCodeSyncEvent = utils.createEvent(
-        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SyncEvent.NAME),
+    const syncEvent = utils.createEvent(
+        UiDllCode.SyncEvent.NAME,
         UiDllCode.SyncEvent.DESIRED_ACCESS,
     ) orelse {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
 
-    _ = injectDll(
+    injectDll(
         explorerProcess,
         remoteUiDllPathPtr,
         utils.getLibFn(
@@ -125,16 +124,16 @@ pub fn main() void {
             win.LoadLibraryW,
             "LoadLibraryW",
         ),
-    ) orelse {
+    ) or {
         @panic(Errors.Main.INJECT_UI_DLL_FAIL);
     };
 
-    const waitResult = win.WaitForSingleObject(
-        uiDllCodeSyncEvent,
+    const waitSyncEventResult = win.WaitForSingleObject(
+        syncEvent,
         constants.STYLE_TASKBAR_ATTEMPTS_TIME_MS + 6_000,
     );
 
-    if (waitResult != win.WAIT_OBJECT_0) {
+    if (waitSyncEventResult != win.WAIT_OBJECT_0) {
         @panic(Errors.Main.WAIT_UI_DLL_FAIL);
     }
 
@@ -150,19 +149,31 @@ pub fn main() void {
 
 /// Injects DLL of `remoteUiDllPathPtr` to `process`.
 ///
-/// Returns handle of injected remote thread or `null` in case of error.
+/// Returns a boolean indicating success or fail.
 inline fn injectDll(
     process: zigWin.HANDLE,
     remoteDllPathPtr: *const anyopaque,
     /// Pointer to `LoadLibraryW` function of `kernel32.dll` that is valid in `process` address space.
     ///
     /// This parameter is needed not to search
-    /// `LoadLibraryW` every time, when DLLs injected multiple times.
+    /// `LoadLibraryW` every time, when DLLs are injected multiple times.
     loadLibraryW: *const win.LoadLibraryW,
-) ?zigWin.HANDLE {
-    return utils.createRemoteThread(
+) bool {
+    const injectedThread = utils.createRemoteThread(
         process,
         @ptrCast(loadLibraryW),
         @constCast(remoteDllPathPtr),
-    );
+    ) orelse {
+        return false;
+    };
+
+    const waitThreadResult = win.WaitForSingleObject(injectedThread, 6000);
+    if (waitThreadResult != win.WAIT_OBJECT_0) {
+        return false;
+    }
+
+    var loadLibraryResult: zigWin.DWORD = 0;
+    _ = win.GetExitCodeThread(injectedThread, &loadLibraryResult);
+
+    return loadLibraryResult != 0;
 }
