@@ -104,7 +104,7 @@ fn init(
     _ = routineArg;
 
     const uiDllCodeMapping = FileMapping.open(
-        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
+        UiDllCode.FileMapping.NAME,
         UiDllCode.FileMapping.SIZE,
         win.FILE_MAP_WRITE,
     ) orelse {
@@ -112,15 +112,15 @@ fn init(
     };
     const uiDllCodePtr: *UiDllCodeTagType = @ptrCast(@alignCast(uiDllCodeMapping.ptr));
 
-    const uiDllSyncEvent = utils.openEvent(
-        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.SyncEvent.NAME),
+    const syncEvent = utils.openEvent(
+        UiDllCode.SyncEvent.NAME,
         UiDllCode.SyncEvent.DESIRED_ACCESS,
     ) orelse {
         exitDll(dllHandle, .Fail);
     };
 
     const initializeXamlDiagnosticsEx = utils.getLibFn(
-        win.GetModuleHandleW("Windows.UI.Xaml.dll"),
+        utils.getLibHandle("Windows.UI.Xaml.dll"),
         win.InitializeXamlDiagnosticsEx,
         "InitializeXamlDiagnosticsEx",
     );
@@ -132,7 +132,7 @@ fn init(
     } orelse {
         setUiDllCode(
             .GetExePathFail,
-            uiDllSyncEvent,
+            syncEvent,
             uiDllCodePtr,
         );
 
@@ -248,12 +248,12 @@ fn init(
         );
 
         if (registerCallbackResult != .S_OK) {
-            setUiDllCode(.RegisterTreeServiceCallbackFail, uiDllSyncEvent, uiDllCodePtr);
+            setUiDllCode(.RegisterTreeServiceCallbackFail, syncEvent, uiDllCodePtr);
 
             exitDll(dllHandle, .Fail);
         }
     } else {
-        setUiDllCode(.InitXamlDiagsFail, uiDllSyncEvent, uiDllCodePtr);
+        setUiDllCode(.InitXamlDiagsFail, syncEvent, uiDllCodePtr);
 
         __debugLog__("init diags fail");
 
@@ -262,7 +262,7 @@ fn init(
 
     // Neccessarily indicate success
 
-    setUiDllCode(.Success, uiDllSyncEvent, uiDllCodePtr);
+    setUiDllCode(.Success, syncEvent, uiDllCodePtr);
 
     return .Success;
 }

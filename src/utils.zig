@@ -232,6 +232,11 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
     unreachable;
 }
 
+/// The library must be already loaded.
+pub inline fn getLibHandle(comptime libName: [:0]const u8) zigWin.HMODULE {
+    return win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral(libName));
+}
+
 /// Returns address of function in `lib` with name `fnName`.
 pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: [:0]const u8) *const Fn {
     return @ptrCast(@alignCast(win.GetProcAddress(lib, fnName)));
@@ -272,7 +277,7 @@ pub const FileMapping = struct {
     ptr: *anyopaque,
 
     pub inline fn create(
-        name: [:0]const u16,
+        comptime name: [:0]const u8,
         /// Size of mapping in bytes.
         size: u32,
         /// `flProtect` parameter of `CreateFileMappingW`.
@@ -286,7 +291,7 @@ pub const FileMapping = struct {
             mappingFlags,
             0,
             size,
-            name,
+            unicode.utf8ToUtf16LeStringLiteral(name),
         ) orelse {
             return null;
         };
@@ -310,7 +315,7 @@ pub const FileMapping = struct {
     }
 
     pub fn open(
-        name: [:0]const u16,
+        comptime name: [:0]const u8,
         size: u32,
         /// `dwDesiredAccess` parameter of `OpenFileMappingW` and `MapViewOfFileEx`.
         mapViewFlags: u32,
@@ -318,10 +323,11 @@ pub const FileMapping = struct {
         const mapping = win.OpenFileMappingW(
             mapViewFlags,
             win.FALSE,
-            name,
+            unicode.utf8ToUtf16LeStringLiteral(name),
         ) orelse {
             return null;
         };
+
         const ptr = win.MapViewOfFileEx(
             mapping,
             mapViewFlags,
@@ -339,6 +345,7 @@ pub const FileMapping = struct {
         };
     }
 };
+
 /// Intended to be called at comptime.
 pub inline fn isDebugMode() bool {
     return comptime builtin.mode == .Debug;

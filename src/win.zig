@@ -397,9 +397,9 @@ pub extern "user32" fn GetWindowThreadProcessId(
     lpwdProcessId: *zigWin.DWORD,
 ) callconv(.winapi) zigWin.DWORD;
 
-pub extern "kerenl32" fn GetExitCodeThread(
+pub extern "kernel32" fn GetExitCodeThread(
     hThread: zigWin.HANDLE,
-    lpExitCode: zigWin.LPDWORD,
+    lpExitCode: LPDWORD,
 ) callconv(.winapi) BOOL;
 
 pub extern "user32" fn VirtualAllocEx(

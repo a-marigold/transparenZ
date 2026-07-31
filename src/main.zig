@@ -94,7 +94,7 @@ pub fn main() void {
     };
 
     const uiDllCodeMapping = FileMapping.create(
-        unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
+        UiDllCode.FileMapping.NAME,
         UiDllCode.FileMapping.SIZE,
         win.PAGE_READWRITE,
         win.FILE_MAP_READ | win.FILE_MAP_WRITE,
@@ -116,17 +116,18 @@ pub fn main() void {
         @panic(Errors.Main.CREATE_UI_DLL_CODE_EVENT_FAIL);
     };
 
-    injectDll(
+    const injectDllResult = injectDll(
         explorerProcess,
         remoteUiDllPathPtr,
         utils.getLibFn(
-            win.GetModuleHandleW(unicode.utf8ToUtf16LeStringLiteral("kernel32.dll")),
+            utils.getLibHandle("kernel32.dll"),
             win.LoadLibraryW,
             "LoadLibraryW",
         ),
-    ) or {
+    );
+    if (!injectDllResult) {
         @panic(Errors.Main.INJECT_UI_DLL_FAIL);
-    };
+    }
 
     const waitSyncEventResult = win.WaitForSingleObject(
         syncEvent,
@@ -147,7 +148,7 @@ pub fn main() void {
     }
 }
 
-/// Injects DLL of `remoteUiDllPathPtr` to `process`.
+/// Injects DLL of `remoteUiDllPathPtr` to `process` and waits for injected thread to handle `LoadLibraryW` return value.
 ///
 /// Returns a boolean indicating success or fail.
 inline fn injectDll(
