@@ -120,14 +120,8 @@ fn init(
         exitDll(dllHandle, .Fail);
     };
 
-    const winUiXamlDll = win.LoadLibraryExW(
-        unicode.utf8ToUtf16LeStringLiteral(constants.WINDOWS_UI_XAML_DLL_NAME),
-        null,
-        win.LOAD_LIBRARY_SEARCH_SYSTEM32,
-    );
-
     const initializeXamlDiagnosticsEx = utils.getLibFn(
-        winUiXamlDll,
+        win.GetModuleHandleW("Windows.UI.Xaml.dll"),
         win.InitializeXamlDiagnosticsEx,
         "InitializeXamlDiagnosticsEx",
     );
