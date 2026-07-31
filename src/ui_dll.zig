@@ -9,12 +9,10 @@
 const std = @import("std");
 const unicode = std.unicode;
 const zigWin = std.os.windows;
-const builtin = @import("builtin");
 
 const win = @import("win.zig");
 const constants = @import("constants.zig");
 const utils = @import("utils.zig");
-
 const TaskbarHook = @import("taskbar_hook.zig");
 
 const UiDllCode = constants.UiDllCode;
@@ -29,12 +27,17 @@ var taskbarHook = &TaskbarHook.taskbarHook;
 ///
 /// Initialized in `DllMain`.
 var dllHandle: zigWin.HMODULE = undefined;
+
 pub const panic = std.debug.FullPanic(struct {
     fn panic(msg: []const u8, first_trace_addr: ?usize) noreturn {
+        @branchHint(.cold);
+
+        _ = msg;
+
         _ = first_trace_addr;
 
         if (comptime utils.isDebugMode()) {
-            __debugLog__("panic {s}", .{msg});
+            __debugLog__("panic0");
         }
 
         exitDll(dllHandle, .Fail);
@@ -48,9 +51,9 @@ export fn DllMain(
 ) callconv(.winapi) win.BOOL {
     _ = lpvReserved;
 
-    dllHandle = @ptrCast(hinstDLL);
+    __debugLog__("0");
 
-    __debugLog__("enter dll", .{});
+    dllHandle = @ptrCast(hinstDLL);
 
     if (fwdReason == win.DLL_PROCESS_ATTACH) {
         _ = win.DisableThreadLibraryCalls(@ptrCast(hinstDLL));
@@ -59,7 +62,7 @@ export fn DllMain(
         // loads libraries and can cause loader lock
         const thread = utils.createThread(&init, null);
 
-        __debugLog__("thread {?}\n last error {}", .{ thread, zigWin.GetLastError() });
+        __debugLog__("1");
 
         if (thread) |handle| {
             _ = win.CloseHandle(handle);
@@ -83,12 +86,12 @@ export fn DllGetClassObject(
     // 'cause `DllGetClassObject` is called only by `InitializeXamlDiagnoticsEx`.
     // But it ensures there won't be any problem
     if (std.meta.eql(rclsid.*, TaskbarHook.TASKBAR_HOOK_GUID)) {
-        __debugLog__("DllGetClassObject success\n", .{});
+        __debugLog__("2");
 
         return taskbarHook.vtable.QueryInterface(taskbarHook, riid, ppv);
     }
 
-    __debugLog__("DllGetClassObject fail last error {}", .{zigWin.GetLastError()});
+    __debugLog__("3");
 
     return .CLASS_E_CLASSNOTAVAILABLE;
 }
@@ -103,7 +106,7 @@ fn init(
     const uiDllCodeMapping = FileMapping.open(
         unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
         UiDllCode.FileMapping.SIZE,
-        win.PAGE_READONLY,
+        win.PAGE_WRITECOPY,
         win.FILE_MAP_WRITE,
     ) orelse {
         exitDll(dllHandle, .Fail);
@@ -215,7 +218,7 @@ fn init(
         diagsName[diagsName.len - 2] = diagsNameCount[0];
         diagsName[diagsName.len - 1] = diagsNameCount[1];
     }) {
-        __debugLog__("diags attempt {}", .{attemptCount});
+        __debugLog__("diags attempt");
 
         var initXamlDiagsResult: win.HRESULT = undefined;
 
@@ -240,7 +243,7 @@ fn init(
             }
         }
 
-        __debugLog__("diags result {}\nlast error {}", .{ initXamlDiagsResult, zigWin.GetLastError() });
+        __debugLog__("diags result");
 
         win.Sleep(attemptInterval);
     }
@@ -259,7 +262,7 @@ fn init(
     } else {
         setUiDllCode(.InitXamlDiagsFail, uiDllSyncEvent, uiDllCodePtr);
 
-        __debugLog__("init diags fail", .{});
+        __debugLog__("init diags fail");
 
         exitDll(dllHandle, .Fail);
     }
@@ -420,20 +423,32 @@ inline fn exitDll(dll: zigWin.HMODULE, exitCode: utils.ThreadRoutineResult) nore
 /// Outputs debug string to `explorer.exe` with added new line.
 ///
 /// To read the output, debugger must be attached to `explorer.exe`.
-fn __debugLog__(comptime format: []const u8, args: anytype) void {
+fn __debugLog__(comptime pos: []const u8) void {
     if (comptime !utils.isDebugMode()) {
         @compileError("'__debugLog__' function is only for Debug build mode");
     }
 
-    const allocator = std.debug.getDebugInfoAllocator();
+    // const allocator = std.heap.smp_allocator;
 
-    // Intended not to free the strings
+    // // Intended not to free the strings
 
-    const formattedString = allocator.print("transparenZ: " ++ format ++ "\n", args) catch unreachable;
-    const debugString = unicode.utf8ToUtf16LeAllocZ(
-        allocator,
-        formattedString,
-    ) catch unreachable;
+    // const formattedString = allocator.print("transparenZ: " ++ format ++ "\n", args) catch unreachable;
+    // const debugString = unicode.utf8ToUtf16LeAllocZ(
+    //     allocator,
+    //     formattedString,
+    // ) catch unreachable;
 
-    win.OutputDebugStringW(debugString);
+    // win.OutputDebugStringW(unicode.utf8ToUtf16LeStringLiteral("TRASNPARENZ"));
+    const file = win.CreateFileW(
+        unicode.utf8ToUtf16LeStringLiteral("C:\\Windows\\Temp\\tZyF") ++ unicode.utf8ToUtf16LeStringLiteral(pos),
+        0x40000000,
+        0,
+        null,
+        2,
+        128,
+
+        null,
+    );
+
+    _ = win.CloseHandle(file);
 }

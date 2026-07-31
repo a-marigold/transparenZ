@@ -29,6 +29,8 @@ pub const MEM_COMMIT = 0x00001000;
 pub const PAGE_READONLY = 0x02;
 pub const PAGE_READWRITE = 0x04;
 
+pub const PAGE_WRITECOPY = 0x08;
+
 pub const FILE_MAP_READ = 0x0004;
 pub const FILE_MAP_WRITE = 0x0002;
 
@@ -297,6 +299,16 @@ pub const LoadLibraryW = fn (
     lpLibFileName: zigWin.LPCWSTR,
 ) callconv(.winapi) zigWin.HMODULE;
 
+pub extern "kernel32" fn CreateFileW(
+    lpFileName: zigWin.LPCWSTR,
+    dwDesiredAccess: zigWin.DWORD,
+    dwShareMode: zigWin.DWORD,
+    lpSecurityAttributes: ?*zigWin.SECURITY_ATTRIBUTES,
+    dwCreationDisposition: zigWin.DWORD,
+    dwFlagsAndAttributes: zigWin.DWORD,
+    hTemplateFile: ?zigWin.HANDLE,
+) callconv(.winapi) zigWin.HANDLE;
+
 pub extern "kernel32" fn LoadLibraryExW(
     lpLibFileName: zigWin.LPCWSTR,
     hFile: ?zigWin.HANDLE,
@@ -384,6 +396,11 @@ pub extern "user32" fn GetWindowThreadProcessId(
     hwnd: zigWin.HWND,
     lpwdProcessId: *zigWin.DWORD,
 ) callconv(.winapi) zigWin.DWORD;
+
+pub extern "kerenl32" fn GetExitCodeThread(
+    hThread: zigWin.HANDLE,
+    lpExitCode: zigWin.LPDWORD,
+) callconv(.winapi) BOOL;
 
 pub extern "user32" fn VirtualAllocEx(
     hProcess: zigWin.HANDLE,
