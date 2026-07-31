@@ -232,34 +232,41 @@ pub inline fn exit(exitCode: zigWin.UINT) noreturn {
     unreachable;
 }
 
-/// Returns address of `lib` function with name `fnName`.
+/// Returns address of function in `lib` with name `fnName`.
 pub inline fn getLibFn(lib: zigWin.HMODULE, comptime Fn: type, fnName: [:0]const u8) *const Fn {
     return @ptrCast(@alignCast(win.GetProcAddress(lib, fnName)));
 }
 
 /// Creates nonsignaled non-inheritable auto reseted event.
 pub inline fn createEvent(
-    name: [:0]const u16,
+    comptime name: [:0]const u8,
     /// `dwDesiredAccess` parameter of `CreateEventExW`.
     desiredAccess: u32,
 ) ?zigWin.HANDLE {
-    return win.CreateEventExW(null, name, 0, desiredAccess);
+    return win.CreateEventExW(
+        null,
+        unicode.utf8ToUtf16LeStringLiteral(name),
+        0,
+        desiredAccess,
+    );
 }
 
 /// Opens non-inheritable event.
 pub inline fn openEvent(
-    name: [:0]const u16,
+    comptime name: [:0]const u8,
     /// `dwDesiredAccess` parameter of `OpenEventW`.
     desiredAccess: u32,
 ) ?zigWin.HANDLE {
-    return win.OpenEventW(desiredAccess, win.FALSE, name);
+    return win.OpenEventW(
+        desiredAccess,
+        win.FALSE,
+        unicode.utf8ToUtf16LeStringLiteral(name),
+    );
 }
 
 pub const FileMapping = struct {
     /// Handle of mapping.
     handle: zigWin.HANDLE,
-
-    // TODO: rename to 'ptr'
 
     /// Pointer to mapped memory in address space of the current process.
     ptr: *anyopaque,
@@ -295,8 +302,6 @@ pub const FileMapping = struct {
             return null;
         };
 
-        std.debug.print("{}\n{}\n", .{ ptr, zigWin.GetLastError() });
-
         return .{
             .handle = mapping,
 
@@ -307,19 +312,16 @@ pub const FileMapping = struct {
     pub fn open(
         name: [:0]const u16,
         size: u32,
-        /// `OpenFileMappingW` parameter named `dwDesiredAccess`.
-        mappingFlags: u32,
-        /// `MapViewOfFileEx` parameter named `dwDesiredAccess`.
+        /// `dwDesiredAccess` parameter of `OpenFileMappingW` and `MapViewOfFileEx`.
         mapViewFlags: u32,
     ) ?FileMapping {
         const mapping = win.OpenFileMappingW(
-            mappingFlags,
+            mapViewFlags,
             win.FALSE,
             name,
         ) orelse {
             return null;
         };
-
         const ptr = win.MapViewOfFileEx(
             mapping,
             mapViewFlags,
@@ -337,7 +339,6 @@ pub const FileMapping = struct {
         };
     }
 };
-
 /// Intended to be called at comptime.
 pub inline fn isDebugMode() bool {
     return comptime builtin.mode == .Debug;

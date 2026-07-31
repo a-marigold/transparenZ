@@ -106,7 +106,6 @@ fn init(
     const uiDllCodeMapping = FileMapping.open(
         unicode.utf8ToUtf16LeStringLiteral(UiDllCode.FileMapping.NAME),
         UiDllCode.FileMapping.SIZE,
-        win.PAGE_WRITECOPY,
         win.FILE_MAP_WRITE,
     ) orelse {
         exitDll(dllHandle, .Fail);
